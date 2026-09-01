@@ -19,14 +19,12 @@ import { SidebarContent } from './Sidebar';
 import { GlobalSearch } from './GlobalSearch';
 import { NotificationsMenu } from './NotificationsMenu';
 import { useTheme } from '@/hooks/useTheme';
-import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useAuth } from '@/hooks/useAuth';
 
 export function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggle } = useTheme();
-  const currentUser = useCurrentUser();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const signOut = () => {
@@ -76,7 +74,7 @@ export function AppLayout() {
                 <Button variant="ghost" size="icon" className="rounded-full">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className="bg-primary text-xs text-primary-foreground">
-                      {currentUser.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                      {user?.name.split(' ').map((n) => n[0]).slice(0, 2).join('') ?? '?'}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -84,8 +82,8 @@ export function AppLayout() {
               <DropdownMenuContent align="end" className="w-52">
                 <DropdownMenuLabel>
                   <div className="flex flex-col">
-                    <span>{currentUser.name}</span>
-                    <span className="text-xs font-normal text-muted-foreground">{currentUser.role}</span>
+                    <span>{user?.name ?? 'User'}</span>
+                    <span className="text-xs font-normal text-muted-foreground">{user?.role ?? ''}</span>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />

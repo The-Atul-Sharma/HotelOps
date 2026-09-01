@@ -38,8 +38,8 @@ import {
 import { calculateNights, computeBookingBill } from '@/utils/finance';
 import { hasConflict } from './bookingUtils';
 import { nextBookingCode } from '@/services/mockData';
-import { PAYMENT_MODES } from '@/config/constants';
-import type { Booking, BookingPayment, PaymentMode } from '@/types';
+import { PAYMENT_MODES, PAYMENT_ACCOUNTS, PAYMENT_ACCOUNT_LABELS } from '@/config/constants';
+import type { Booking, BookingPayment, PaymentAccount, PaymentMode } from '@/types';
 
 const FORM_STATUSES = ['Checked In', 'Reserved'] as const;
 
@@ -56,6 +56,7 @@ const schema = z
     roomTariff: z.coerce.number().min(0, 'Room tariff must be 0 or more'),
     advanceReceived: z.coerce.number().min(0),
     paymentMode: z.enum(PAYMENT_MODES as [PaymentMode, ...PaymentMode[]]),
+    paymentAccount: z.enum(PAYMENT_ACCOUNTS as [PaymentAccount, ...PaymentAccount[]]),
     status: z.enum(FORM_STATUSES),
     notes: z.string().optional(),
   })
@@ -107,6 +108,7 @@ export function BookingFormDialog({
       roomTariff: undefined,
       advanceReceived: undefined,
       paymentMode: 'Cash',
+      paymentAccount: 'None',
       status: 'Checked In',
       notes: '',
     },
@@ -131,6 +133,8 @@ export function BookingFormDialog({
         roomTariff: booking.roomAmount || booking.totalAmount || undefined,
         advanceReceived: booking.advanceReceived || undefined,
         paymentMode: booking.paymentMode,
+        paymentAccount:
+          booking.payments?.find((p) => p.note === 'Advance')?.account ?? 'None',
         status,
         notes: booking.notes ?? '',
       });
@@ -210,6 +214,7 @@ export function BookingFormDialog({
     const taxPercent = settings?.taxPercent ?? 0;
     const extraCharges = booking?.extraCharges ?? [];
     const mode = v.paymentMode as PaymentMode;
+    const account = v.paymentAccount as PaymentAccount;
 
     let payments: BookingPayment[];
     if (booking) {
@@ -217,12 +222,13 @@ export function BookingFormDialog({
       const advanceIdx = existing.findIndex((p) => p.note === 'Advance');
       if (advance > 0) {
         if (advanceIdx >= 0) {
-          existing[advanceIdx] = { ...existing[advanceIdx], amount: advance, mode };
+          existing[advanceIdx] = { ...existing[advanceIdx], amount: advance, mode, account };
         } else {
           existing.unshift({
             id: `pay-${Date.now()}`,
             amount: advance,
             mode,
+            account,
             date: v.checkInDate,
             note: 'Advance',
           });
@@ -239,6 +245,7 @@ export function BookingFormDialog({
                 id: `pay-${Date.now()}`,
                 amount: advance,
                 mode,
+                account,
                 date: v.checkInDate,
                 note: 'Advance',
               },
@@ -401,7 +408,11 @@ export function BookingFormDialog({
             <Field label="Payment Mode">
               <Select
                 value={values.paymentMode}
-                onValueChange={(v) => setValue('paymentMode', v as PaymentMode)}
+                onValueChange={(v) => {
+                  const mode = v as PaymentMode;
+                  setValue('paymentMode', mode);
+                  if (mode === 'Cash') setValue('paymentAccount', 'None');
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -410,6 +421,23 @@ export function BookingFormDialog({
                   {PAYMENT_MODES.map((m) => (
                     <SelectItem key={m} value={m}>
                       {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Account">
+              <Select
+                value={values.paymentAccount}
+                onValueChange={(v) => setValue('paymentAccount', v as PaymentAccount)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_ACCOUNTS.map((a) => (
+                    <SelectItem key={a} value={a}>
+                      {PAYMENT_ACCOUNT_LABELS[a]}
                     </SelectItem>
                   ))}
                 </SelectContent>

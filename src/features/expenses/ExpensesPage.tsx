@@ -40,12 +40,12 @@ import { usePagination } from "@/hooks/usePagination";
 import { useDateRange } from "@/hooks/useDateRange";
 import { DateRangeFilter } from "@/components/shared/DateRangeFilter";
 import { PaginationBar } from "@/components/shared/Pagination";
-import { EXPENSE_CATEGORIES, PAYMENT_MODES } from "@/config/constants";
+import { EXPENSE_CATEGORIES, PAYMENT_ACCOUNTS, PAYMENT_ACCOUNT_LABELS, PAYMENT_MODES } from "@/config/constants";
 import { exportToExcel } from "@/utils/excel";
 import { formatDate, formatINR } from "@/utils/format";
 import { inRange } from "@/utils/dateRange";
 import dayjs from "dayjs";
-import type { Expense, PaymentMode, TransactionCategory } from "@/types";
+import type { Expense, PaymentAccount, PaymentMode, TransactionCategory } from "@/types";
 
 const schema = z
   .object({
@@ -56,6 +56,7 @@ const schema = z
     expenseName: z.string().optional(),
     amount: z.coerce.number().positive("Amount must be positive"),
     paymentMode: z.enum(PAYMENT_MODES as [PaymentMode, ...PaymentMode[]]),
+    account: z.enum(PAYMENT_ACCOUNTS as [PaymentAccount, ...PaymentAccount[]]),
     remarks: z.string().optional(),
   })
   .superRefine((v, ctx) => {
@@ -99,6 +100,7 @@ function emptyForm(): FormValues {
     expenseName: "Grocery",
     amount: undefined,
     paymentMode: "Cash",
+    account: "None",
     remarks: "",
   };
 }
@@ -175,6 +177,7 @@ export default function ExpensesPage() {
       expenseName: editable ? e.description : e.category,
       amount: e.amount,
       paymentMode: e.paymentMode,
+      account: e.account ?? "None",
       remarks: e.remarks ?? "",
     });
     setOpen(true);
@@ -189,6 +192,7 @@ export default function ExpensesPage() {
       description: NAME_EDITABLE.has(category) ? name : category,
       amount: Number(v.amount),
       paymentMode: v.paymentMode as PaymentMode,
+      account: v.account as PaymentAccount,
       remarks: v.remarks?.trim() || undefined,
     } as Omit<Expense, "id" | "createdAt" | "updatedAt">;
 
@@ -318,6 +322,7 @@ export default function ExpensesPage() {
                   <TableHead>Expense name</TableHead>
                   <TableHead>Person name</TableHead>
                   <TableHead>Mode</TableHead>
+                  <TableHead>Account</TableHead>
                   <TableHead>Remark</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -337,6 +342,7 @@ export default function ExpensesPage() {
                       {e.category === "STF" ? e.description : "—"}
                     </TableCell>
                     <TableCell>{e.paymentMode}</TableCell>
+                    <TableCell>{e.account === "None" || !e.account ? "—" : e.account}</TableCell>
                     <TableCell className="max-w-[160px] truncate text-muted-foreground">
                       {e.remarks || "—"}
                     </TableCell>
@@ -433,9 +439,11 @@ export default function ExpensesPage() {
               <F label="Payment Mode">
                 <Select
                   value={watch("paymentMode")}
-                  onValueChange={(v) =>
-                    setValue("paymentMode", v as PaymentMode)
-                  }
+                  onValueChange={(v) => {
+                    const mode = v as PaymentMode;
+                    setValue("paymentMode", mode);
+                    if (mode === "Cash") setValue("account", "None");
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -450,6 +458,23 @@ export default function ExpensesPage() {
                 </Select>
               </F>
             </div>
+            <F label="Account">
+              <Select
+                value={watch("account")}
+                onValueChange={(v) => setValue("account", v as PaymentAccount)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_ACCOUNTS.map((a) => (
+                    <SelectItem key={a} value={a}>
+                      {PAYMENT_ACCOUNT_LABELS[a]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </F>
             <F label="Remark">
               <Input {...register("remarks")} placeholder="Optional" />
             </F>

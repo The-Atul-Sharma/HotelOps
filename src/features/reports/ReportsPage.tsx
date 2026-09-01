@@ -15,24 +15,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  useTransactions,
-  useExpenses,
-  useBookings,
-} from "@/hooks/useEntities";
+import { useExpenses, useBookings } from "@/hooks/useEntities";
 import { usePagination } from "@/hooks/usePagination";
 import { useDateRange } from "@/hooks/useDateRange";
 import { inRange } from "@/utils/dateRange";
 import {
-  summarizeTransactions,
-  transactionIncome,
-  transactionCollection,
-  round2,
   bookingExtrasIncome,
+  bookingRoomIncome,
+  bookingTotalIncome,
+  calculatePaymentStatus,
+  isActiveBooking,
+  paymentCollectionBucket,
+  resolveBookingPayments,
+  round2,
 } from "@/utils/finance";
 import { exportToExcel } from "@/utils/excel";
 import { formatDate } from "@/utils/format";
-import type { Booking, Expense, Transaction } from "@/types";
+import type { Booking, BookingPayment, DateRange, Expense } from "@/types";
 
 const REPORTS = [
   "Daily Collection",
@@ -45,25 +44,60 @@ const REPORTS = [
 ] as const;
 type ReportType = (typeof REPORTS)[number];
 
+type PaymentRow = { booking: Booking; payment: BookingPayment };
+
+function collectPayments(bookings: Booking[], range: DateRange): PaymentRow[] {
+  const rows: PaymentRow[] = [];
+  for (const b of bookings) {
+    if (!isActiveBooking(b)) continue;
+    for (const payment of resolveBookingPayments(b)) {
+      if (inRange(payment.date, range)) {
+        rows.push({ booking: b, payment });
+      }
+    }
+  }
+  return rows;
+}
+
+function bookingPending(b: Booking) {
+  return Math.max(b.balanceAmount, 0);
+}
+
 export default function ReportsPage() {
-  const { data: transactions = [], isLoading } = useTransactions();
-  const { data: bookings = [] } = useBookings();
+  const { data: bookings = [], isLoading } = useBookings();
   const { data: expenses = [] } = useExpenses();
   const { range, resetKey, filterProps } = useDateRange("month");
   const [report, setReport] = useState<ReportType>("Daily Profit");
 
-  const scoped = useMemo(
-    () => transactions.filter((t) => inRange(t.date, range) && !t.voided),
-    [transactions, range],
-  );
   const scopedExpenses = useMemo(
     () => expenses.filter((e) => inRange(e.date, range)),
     [expenses, range],
   );
 
+  const paymentRows = useMemo(
+    () => collectPayments(bookings, range),
+    [bookings, range],
+  );
+
+  const incomeBookings = useMemo(
+    () =>
+      bookings.filter(
+        (b) => isActiveBooking(b) && inRange(b.checkInDate, range),
+      ),
+    [bookings, range],
+  );
+
   const { rows, columns, summary } = useMemo(
-    () => buildReport(report, scoped, bookings, scopedExpenses, range),
-    [report, scoped, bookings, scopedExpenses, range],
+    () =>
+      buildReport(
+        report,
+        paymentRows,
+        incomeBookings,
+        bookings,
+        scopedExpenses,
+        range,
+      ),
+    [report, paymentRows, incomeBookings, bookings, scopedExpenses, range],
   );
 
   const { page, setPage, pageItems, total: pageTotal } = usePagination(
@@ -192,35 +226,65 @@ interface Column {
   money?: boolean;
 }
 
+function emptyCollection() {
+  return { cash: 0, online: 0, upi: 0, card: 0 };
+}
+
+function addPaymentToCollection(
+  entry: ReturnType<typeof emptyCollection>,
+  payment: BookingPayment,
+) {
+  const bucket = paymentCollectionBucket(payment.mode);
+  if (!bucket) return;
+  entry[bucket] = round2(entry[bucket] + payment.amount);
+}
+
+function collectionTotals(payments: PaymentRow[]) {
+  const totals = emptyCollection();
+  for (const { payment } of payments) {
+    addPaymentToCollection(totals, payment);
+  }
+  return totals;
+}
+
 function buildReport(
   report: ReportType,
-  scoped: Transaction[],
+  paymentRows: PaymentRow[],
+  incomeBookings: Booking[],
   bookings: Booking[],
   expenses: Expense[],
-  range: { from: string; to: string },
+  range: DateRange,
 ): {
   rows: Record<string, unknown>[];
   columns: Column[];
   summary: { label: string; value: number; tone?: string }[];
 } {
-  const totals = summarizeTransactions(scoped);
+  const totals = collectionTotals(paymentRows);
+  const totalRevenue = round2(
+    incomeBookings.reduce((s, b) => s + bookingTotalIncome(b), 0),
+  );
+  const totalExpenses = round2(expenses.reduce((s, e) => s + e.amount, 0));
+  const netProfit = round2(totalRevenue - totalExpenses);
+  const totalPending = round2(
+    bookings
+      .filter(
+        (b) =>
+          isActiveBooking(b) &&
+          bookingPending(b) > 0 &&
+          inRange(b.checkInDate, range),
+      )
+      .reduce((s, b) => s + bookingPending(b), 0),
+  );
 
   switch (report) {
     case "Daily Collection": {
-      const map = new Map<
-        string,
-        { cash: number; online: number; upi: number; card: number }
-      >();
-      scoped.forEach((t) => {
-        const c = transactionCollection(t);
-        if (c.total <= 0) return;
-        const e = map.get(t.date) ?? { cash: 0, online: 0, upi: 0, card: 0 };
-        e.cash += c.cash;
-        e.online += c.online;
-        e.upi += c.upi;
-        e.card += c.card;
-        map.set(t.date, e);
-      });
+      const map = new Map<string, ReturnType<typeof emptyCollection>>();
+      for (const { payment } of paymentRows) {
+        const date = payment.date.slice(0, 10);
+        const entry = map.get(date) ?? emptyCollection();
+        addPaymentToCollection(entry, payment);
+        map.set(date, entry);
+      }
       const rows = Array.from(map.entries())
         .sort((a, b) => (a[0] < b[0] ? 1 : -1))
         .map(([date, v]) => ({
@@ -251,12 +315,18 @@ function buildReport(
     }
     case "Daily Profit": {
       const map = new Map<string, { income: number; expense: number }>();
-      scoped.forEach((t) => {
-        const e = map.get(t.date) ?? { income: 0, expense: 0 };
-        e.income += transactionIncome(t);
-        e.expense += t.expense;
-        map.set(t.date, e);
-      });
+      for (const b of incomeBookings) {
+        const date = b.checkInDate.slice(0, 10);
+        const entry = map.get(date) ?? { income: 0, expense: 0 };
+        entry.income += bookingTotalIncome(b);
+        map.set(date, entry);
+      }
+      for (const e of expenses) {
+        const date = e.date.slice(0, 10);
+        const entry = map.get(date) ?? { income: 0, expense: 0 };
+        entry.expense += e.amount;
+        map.set(date, entry);
+      }
       const rows = Array.from(map.entries())
         .sort((a, b) => (a[0] < b[0] ? 1 : -1))
         .map(([date, v]) => ({
@@ -276,17 +346,17 @@ function buildReport(
         summary: [
           {
             label: "Total Income",
-            value: totals.totalIncome,
+            value: totalRevenue,
             tone: "text-success",
           },
           {
             label: "Total Expense",
-            value: totals.totalExpense,
+            value: totalExpenses,
             tone: "text-destructive",
           },
           {
             label: "Net Profit",
-            value: totals.netProfit,
+            value: netProfit,
             tone: "text-primary",
           },
         ],
@@ -294,13 +364,18 @@ function buildReport(
     }
     case "Monthly Profit & Loss": {
       const map = new Map<string, { income: number; expense: number }>();
-      scoped.forEach((t) => {
-        const key = t.date.slice(0, 7);
-        const e = map.get(key) ?? { income: 0, expense: 0 };
-        e.income += transactionIncome(t);
-        e.expense += t.expense;
-        map.set(key, e);
-      });
+      for (const b of incomeBookings) {
+        const key = b.checkInDate.slice(0, 7);
+        const entry = map.get(key) ?? { income: 0, expense: 0 };
+        entry.income += bookingTotalIncome(b);
+        map.set(key, entry);
+      }
+      for (const e of expenses) {
+        const key = e.date.slice(0, 7);
+        const entry = map.get(key) ?? { income: 0, expense: 0 };
+        entry.expense += e.amount;
+        map.set(key, entry);
+      }
       const rows = Array.from(map.entries()).map(([month, v]) => ({
         Month: month,
         Income: round2(v.income),
@@ -318,33 +393,42 @@ function buildReport(
         summary: [
           {
             label: "Total Income",
-            value: totals.totalIncome,
+            value: totalRevenue,
             tone: "text-success",
           },
           {
             label: "Total Expense",
-            value: totals.totalExpense,
+            value: totalExpenses,
             tone: "text-destructive",
           },
           {
             label: "Net Profit",
-            value: totals.netProfit,
+            value: netProfit,
             tone: "text-primary",
           },
         ],
       };
     }
     case "Pending Payments": {
-      const rows = scoped
-        .filter((t) => t.pendingAmount > 0)
-        .map((t) => ({
-          Date: formatDate(t.date),
-          Guest: t.guest || t.party || "—",
-          Room: t.roomNumber || "—",
-          Total: t.totalAmount,
-          Paid: t.paidAmount,
-          Pending: t.pendingAmount,
-          Status: t.paymentStatus,
+      const rows = bookings
+        .filter(
+          (b) =>
+            isActiveBooking(b) &&
+            bookingPending(b) > 0 &&
+            inRange(b.checkInDate, range),
+        )
+        .map((b) => ({
+          Date: formatDate(b.checkInDate),
+          Guest: b.guestName || "—",
+          Room: b.roomNumber || "—",
+          Total: b.totalAmount,
+          Paid: b.paidAmount,
+          Pending: bookingPending(b),
+          Status: calculatePaymentStatus(
+            b.totalAmount,
+            b.paidAmount,
+            b.checkOutDate,
+          ),
         }));
       return {
         rows,
@@ -360,7 +444,7 @@ function buildReport(
         summary: [
           {
             label: "Total Pending",
-            value: totals.pending,
+            value: totalPending,
             tone: "text-warning",
           },
         ],
@@ -368,13 +452,13 @@ function buildReport(
     }
     case "Room Revenue": {
       const map = new Map<string, { rent: number; extras: number }>();
-      scoped.forEach((t) => {
-        if (!t.roomNumber) return;
-        const e = map.get(t.roomNumber) ?? { rent: 0, extras: 0 };
-        e.rent += t.roomRent;
-        e.extras += t.roomService;
-        map.set(t.roomNumber, e);
-      });
+      for (const b of incomeBookings) {
+        if (!b.roomNumber) continue;
+        const entry = map.get(b.roomNumber) ?? { rent: 0, extras: 0 };
+        entry.rent += bookingRoomIncome(b);
+        entry.extras += bookingExtrasIncome(b);
+        map.set(b.roomNumber, entry);
+      }
       const rows = Array.from(map.entries())
         .sort((a, b) => b[1].rent + b[1].extras - (a[1].rent + a[1].extras))
         .map(([room, v]) => ({
@@ -394,11 +478,15 @@ function buildReport(
         summary: [
           {
             label: "Room Rent",
-            value: round2(scoped.reduce((s, t) => s + t.roomRent, 0)),
+            value: round2(
+              incomeBookings.reduce((s, b) => s + bookingRoomIncome(b), 0),
+            ),
           },
           {
             label: "Extra Charges",
-            value: round2(scoped.reduce((s, t) => s + t.roomService, 0)),
+            value: round2(
+              incomeBookings.reduce((s, b) => s + bookingExtrasIncome(b), 0),
+            ),
           },
         ],
       };
@@ -406,8 +494,7 @@ function buildReport(
     case "Extra Charges": {
       const active = bookings.filter(
         (b) =>
-          b.status !== "Cancelled" &&
-          b.status !== "No Show" &&
+          isActiveBooking(b) &&
           inRange(b.checkInDate, range) &&
           bookingExtrasIncome(b) > 0,
       );

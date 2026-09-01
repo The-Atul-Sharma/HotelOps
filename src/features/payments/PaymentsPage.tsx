@@ -157,6 +157,7 @@ export default function PaymentsPage() {
                   <TableHead>Guest</TableHead>
                   <TableHead className="text-center">Room</TableHead>
                   <TableHead>Mode</TableHead>
+                  <TableHead>Account</TableHead>
                   <TableHead>Note</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead className="text-right">Action</TableHead>
@@ -171,6 +172,7 @@ export default function PaymentsPage() {
                     <TableCell className="font-medium">{b.guestName}</TableCell>
                     <TableCell className="text-center">{b.roomNumber}</TableCell>
                     <TableCell>{p.mode}</TableCell>
+                    <TableCell>{!p.account || p.account === "None" ? "—" : p.account}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {p.note || "—"}
                     </TableCell>

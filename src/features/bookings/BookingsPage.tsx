@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { toast } from 'sonner';
 import { Plus, Search, Eye, Pencil, LogOut } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { LoadingState, EmptyState } from '@/components/shared/states';
@@ -17,12 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useBookings, bookingHooks } from '@/hooks/useEntities';
+import { useBookings } from '@/hooks/useEntities';
 import { useDebounced } from '@/hooks/useDebounced';
 import { usePagination } from '@/hooks/usePagination';
-import { useConfirm } from '@/components/shared/ConfirmDialog';
 import { DateRangeFilter } from '@/components/shared/DateRangeFilter';
 import { BookingFormDialog } from './BookingFormDialog';
+import { BookingCheckoutDialog } from './BookingCheckoutDialog';
 import { calculatePaymentStatus, sumExtraCharges } from '@/utils/finance';
 import { formatDate } from '@/utils/format';
 import { inRange } from '@/utils/dateRange';
@@ -37,14 +36,13 @@ const FILTER_STATUSES: BookingStatus[] = [
 
 export default function BookingsPage() {
   const { data: bookings = [], isLoading } = useBookings();
-  const update = bookingHooks.useUpdate();
-  const confirm = useConfirm();
   const [search, setSearch] = useState('');
   const debounced = useDebounced(search, 250);
   const [status, setStatus] = useState<BookingStatus | 'ALL'>('ALL');
   const { range, resetKey, filterProps } = useDateRange('month');
   const [formOpen, setFormOpen] = useState(false);
   const [editBooking, setEditBooking] = useState<Booking | undefined>();
+  const [checkoutBooking, setCheckoutBooking] = useState<Booking | undefined>();
 
   const filtered = useMemo(() => {
     const q = debounced.toLowerCase();
@@ -65,24 +63,8 @@ export default function BookingsPage() {
     filtered,
     `${resetKey}|${status}|${debounced}`,
   );
-  const handleCheckout = async (booking: Booking) => {
-    if (booking.balanceAmount > 0) {
-      toast.error(
-        `Cannot check out — ₹${booking.balanceAmount} still pending for ${booking.guestName}`,
-      );
-      return;
-    }
-    const ok = await confirm({
-      title: `Check out Room ${booking.roomNumber}?`,
-      description: `${booking.guestName} · Balance cleared`,
-      confirmText: 'Check Out',
-    });
-    if (!ok) return;
-    await update.mutateAsync({
-      id: booking.id,
-      patch: { status: 'Checked Out' },
-    });
-    toast.success(`Room ${booking.roomNumber} checked out`);
+  const handleCheckout = (booking: Booking) => {
+    setCheckoutBooking(booking);
   };
 
   if (isLoading) return <LoadingState label="Loading bookings…" />;
@@ -224,6 +206,14 @@ export default function BookingsPage() {
       )}
 
       <BookingFormDialog open={formOpen} onOpenChange={setFormOpen} booking={editBooking} />
+
+      <BookingCheckoutDialog
+        booking={checkoutBooking ?? null}
+        open={checkoutBooking != null}
+        onOpenChange={(open) => {
+          if (!open) setCheckoutBooking(undefined);
+        }}
+      />
     </div>
   );
 }

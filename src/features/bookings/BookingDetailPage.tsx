@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -29,15 +30,18 @@ import { useConfirm } from '@/components/shared/ConfirmDialog';
 import {
   calculatePaymentStatus,
   computeSplitBookingBill,
+  isExtraChargePaid,
   paymentsByMode,
   roomPaymentsOnly,
   sumPayments,
 } from '@/utils/finance';
 import { formatDate, formatINR } from '@/utils/format';
 import { BookingFormDialog } from './BookingFormDialog';
+import { BookingCheckoutDialog } from './BookingCheckoutDialog';
+import { buildSettledExtras } from './bookingCheckout';
 import { Invoice } from './Invoice';
-import { PAYMENT_MODES } from '@/config/constants';
-import type { BookingCharge, BookingPayment, PaymentMode } from '@/types';
+import { PAYMENT_MODES, PAYMENT_ACCOUNTS, PAYMENT_ACCOUNT_LABELS } from '@/config/constants';
+import type { BookingCharge, BookingPayment, PaymentAccount, PaymentMode } from '@/types';
 import dayjs from 'dayjs';
 
 export default function BookingDetailPage() {
@@ -53,9 +57,15 @@ export default function BookingDetailPage() {
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payMode, setPayMode] = useState<PaymentMode>('Cash');
+  const [payAccount, setPayAccount] = useState<PaymentAccount>('None');
   const [chargeLabel, setChargeLabel] = useState('');
   const [chargeAmount, setChargeAmount] = useState('');
   const [chargeMode, setChargeMode] = useState<PaymentMode>('Cash');
+  const [chargeAccount, setChargeAccount] = useState<PaymentAccount>('None');
+  const [chargePaidAtOrder, setChargePaidAtOrder] = useState(false);
+  const [collectModes, setCollectModes] = useState<Record<string, PaymentMode>>({});
+  const [collectAccounts, setCollectAccounts] = useState<Record<string, PaymentAccount>>({});
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   const booking = useMemo(() => bookings.find((b) => b.id === id), [bookings, id]);
 
@@ -88,7 +98,6 @@ export default function BookingDetailPage() {
             },
           ]
         : [];
-  const paidTotal = payments.length ? sumPayments(payments) : booking.paidAmount;
   const billPayments = roomPaymentsOnly(payments, extraCharges);
   const roomModeTotals = paymentsByMode(billPayments);
   const taxPercent =
@@ -102,8 +111,7 @@ export default function BookingDetailPage() {
     taxPercent,
     payments,
   });
-  const { taxAmount, roomTotal: roomBillTotal, roomBalance: balance, extrasTotal, grandTotal } =
-    bill;
+  const { taxAmount, roomTotal: roomBillTotal, roomBalance: balance, grandTotal } = bill;
   const status = calculatePaymentStatus(roomBillTotal, bill.roomPaid);
 
   const persistBill = async (
@@ -151,23 +159,28 @@ export default function BookingDetailPage() {
     const chargeId = `xc-${Date.now()}`;
     const next: BookingCharge[] = [
       ...extraCharges,
-      { id: chargeId, label, amount, paymentMode: chargeMode },
+      { id: chargeId, label, amount, paymentMode: chargeMode, account: chargeAccount, paidAtOrder: chargePaidAtOrder },
     ];
-    const nextPayments: BookingPayment[] = [
-      ...payments,
-      {
+    const nextPayments: BookingPayment[] = [...payments];
+    if (chargePaidAtOrder) {
+      nextPayments.push({
         id: `pay-${chargeId}`,
         amount,
         mode: chargeMode,
+        account: chargeAccount,
         date: dayjs().format('YYYY-MM-DD'),
         note: label,
-      },
-    ];
+      });
+    }
     await persistBill(next, nextPayments);
     setChargeLabel('');
     setChargeAmount('');
     setChargeMode('Cash');
-    toast.success(`${label} added · ${chargeMode}`);
+    setChargeAccount('None');
+    setChargePaidAtOrder(false);
+    toast.success(
+      chargePaidAtOrder ? `${label} added · paid ${chargeMode}` : `${label} added · pending`,
+    );
   };
 
   const removeExtraCharge = async (charge: BookingCharge) => {
@@ -184,6 +197,18 @@ export default function BookingDetailPage() {
     toast.success('Charge removed');
   };
 
+  const collectExtraCharge = async (charge: BookingCharge) => {
+    const mode = collectModes[charge.id] ?? charge.paymentMode;
+    const account = collectAccounts[charge.id] ?? charge.account ?? 'None';
+    const { nextExtras, nextPayments } = buildSettledExtras(booking, [charge.id], {
+      [charge.id]: mode,
+    }, {
+      [charge.id]: account,
+    });
+    await persistBill(nextExtras, nextPayments);
+    toast.success(`${charge.label} · ${formatINR(charge.amount)} collected (${mode})`);
+  };
+
   const recordPayment = async () => {
     const amount = Number(payAmount);
     if (!amount || amount <= 0) {
@@ -198,6 +223,7 @@ export default function BookingDetailPage() {
       id: `pay-${Date.now()}`,
       amount,
       mode: payMode,
+      account: payAccount,
       date: dayjs().format('YYYY-MM-DD'),
     };
     const nextPayments = [...payments, entry];
@@ -230,28 +256,8 @@ export default function BookingDetailPage() {
     toast.success('Guest checked in');
   };
 
-  const checkOut = async () => {
-    if (balance > 0) {
-      toast.error(
-        `Cannot check out — ₹${balance} room rent still pending. Collect full payment first.`,
-      );
-      return;
-    }
-    await update.mutateAsync({
-      id: booking.id,
-      patch: {
-        status: 'Checked Out',
-        taxPercent,
-        taxAmount,
-        totalAmount: grandTotal,
-        paidAmount: paidTotal,
-        balanceAmount: balance,
-        otherCharges: bill.otherCharges,
-        extraCharges,
-        payments,
-      },
-    });
-    toast.success('Guest checked out');
+  const checkOut = () => {
+    setCheckoutOpen(true);
   };
 
   const handlePrint = () => {
@@ -358,15 +364,23 @@ export default function BookingDetailPage() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Extra Charges
                 </p>
-                {extraCharges.map((c) => (
-                  <Row
-                    key={c.id}
-                    label={`${c.label} (${c.paymentMode ?? 'Cash'})`}
-                    value={c.amount}
-                  />
-                ))}
-                <Row label="Extras Total" value={extrasTotal} strong />
-                <p className="text-xs text-muted-foreground">Paid on collection · not in room due</p>
+                {extraCharges.map((c) => {
+                  const paid = isExtraChargePaid(c, payments);
+                  return (
+                    <Row
+                      key={c.id}
+                      label={`${c.label}${paid ? ` (${c.paymentMode})` : ''} · ${paid ? 'Paid' : 'Pending'}`}
+                      value={c.amount}
+                      danger={!paid}
+                    />
+                  );
+                })}
+                {bill.extrasPending > 0 && (
+                  <Row label="Extras Pending" value={bill.extrasPending} danger />
+                )}
+                {bill.extrasPaid > 0 && (
+                  <Row label="Extras Paid" value={bill.extrasPaid} />
+                )}
               </>
             )}
             {extraCharges.length > 0 && (
@@ -417,7 +431,14 @@ export default function BookingDetailPage() {
             </div>
             <div className="w-full space-y-1.5 sm:w-36">
               <Label className="text-xs">Payment Mode</Label>
-              <Select value={chargeMode} onValueChange={(v) => setChargeMode(v as PaymentMode)}>
+              <Select
+                value={chargeMode}
+                onValueChange={(v) => {
+                  const mode = v as PaymentMode;
+                  setChargeMode(mode);
+                  if (mode === 'Cash') setChargeAccount('None');
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -430,10 +451,39 @@ export default function BookingDetailPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="w-full space-y-1.5 sm:w-36">
+              <Label className="text-xs">Account</Label>
+              <Select
+                value={chargeAccount}
+                onValueChange={(v) => setChargeAccount(v as PaymentAccount)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_ACCOUNTS.map((a) => (
+                    <SelectItem key={a} value={a}>
+                      {PAYMENT_ACCOUNT_LABELS[a]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Button onClick={addExtraCharge} className="w-full gap-1.5 sm:w-auto">
               <Plus className="h-4 w-4" /> Add to Bill
             </Button>
           </div>
+
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <Checkbox
+              checked={chargePaidAtOrder}
+              onCheckedChange={(v) => setChargePaidAtOrder(v === true)}
+            />
+            <span>Paid at time of order</span>
+          </label>
+          <p className="text-xs text-muted-foreground">
+            Leave unchecked to add as pending — use Collect on the charge or settle at checkout.
+          </p>
 
           {extraCharges.length === 0 ? (
             <p className="text-sm text-muted-foreground">
@@ -441,24 +491,77 @@ export default function BookingDetailPage() {
             </p>
           ) : (
             <div className="divide-y rounded-lg border">
-              {extraCharges.map((c) => (
-                <div key={c.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{c.label}</p>
-                    <p className="text-xs text-muted-foreground">
-                      <Money value={c.amount} muteZero={false} /> · {c.paymentMode ?? 'Cash'}
-                    </p>
+              {extraCharges.map((c) => {
+                const paid = isExtraChargePaid(c, payments);
+                const collectMode = collectModes[c.id] ?? c.paymentMode;
+                return (
+                  <div key={c.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{c.label}</p>
+                      <p className="text-xs text-muted-foreground">
+                        <Money value={c.amount} muteZero={false} />
+                        {paid ? ` · Paid · ${c.paymentMode}${c.account && c.account !== 'None' ? ` · ${PAYMENT_ACCOUNT_LABELS[c.account]}` : ''}` : ' · Pending'}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {!paid && (
+                        <>
+                          <Select
+                            value={collectMode}
+                            onValueChange={(v) =>
+                              setCollectModes((prev) => ({ ...prev, [c.id]: v as PaymentMode }))
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[100px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PAYMENT_MODES.map((m) => (
+                                <SelectItem key={m} value={m}>
+                                  {m}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Select
+                            value={collectAccounts[c.id] ?? c.account ?? 'None'}
+                            onValueChange={(v) =>
+                              setCollectAccounts((prev) => ({ ...prev, [c.id]: v as PaymentAccount }))
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[110px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PAYMENT_ACCOUNTS.map((a) => (
+                                <SelectItem key={a} value={a}>
+                                  {PAYMENT_ACCOUNT_LABELS[a]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-8"
+                            onClick={() => collectExtraCharge(c)}
+                          >
+                            Collect
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-destructive"
+                        onClick={() => removeExtraCharge(c)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 shrink-0 text-destructive"
-                    onClick={() => removeExtraCharge(c)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -471,7 +574,7 @@ export default function BookingDetailPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              Room rent collections only — extras are paid when added above.
+              Room rent collections only — pending extras are collected separately.
             </p>
             <div className="flex flex-wrap items-end gap-3">
               <div className="min-w-[120px] flex-1">
@@ -485,7 +588,14 @@ export default function BookingDetailPage() {
               </div>
               <div className="w-36">
                 <Label className="mb-1.5 block text-xs">Mode</Label>
-                <Select value={payMode} onValueChange={(v) => setPayMode(v as PaymentMode)}>
+                <Select
+                  value={payMode}
+                  onValueChange={(v) => {
+                    const mode = v as PaymentMode;
+                    setPayMode(mode);
+                    if (mode === 'Cash') setPayAccount('None');
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -493,6 +603,21 @@ export default function BookingDetailPage() {
                     {PAYMENT_MODES.map((m) => (
                       <SelectItem key={m} value={m}>
                         {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-36">
+                <Label className="mb-1.5 block text-xs">Account</Label>
+                <Select value={payAccount} onValueChange={(v) => setPayAccount(v as PaymentAccount)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_ACCOUNTS.map((a) => (
+                      <SelectItem key={a} value={a}>
+                        {a} Account
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -512,6 +637,7 @@ export default function BookingDetailPage() {
                     <div className="min-w-0">
                       <p className="font-medium">
                         <Money value={p.amount} muteZero={false} /> · {p.mode}
+                        {p.account && p.account !== 'None' ? ` · ${PAYMENT_ACCOUNT_LABELS[p.account]}` : ''}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {formatDate(p.date)}
@@ -547,6 +673,13 @@ export default function BookingDetailPage() {
           </Button>
         </div>
       </div>
+
+      <BookingCheckoutDialog
+        booking={booking}
+        open={checkoutOpen}
+        onOpenChange={setCheckoutOpen}
+        taxPercent={taxPercent}
+      />
 
       <BookingFormDialog open={editOpen} onOpenChange={setEditOpen} booking={booking} />
 

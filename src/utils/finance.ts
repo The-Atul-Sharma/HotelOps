@@ -58,11 +58,45 @@ export function sumExtraCharges(
   return round2((charges ?? []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0));
 }
 
+export function isExtraChargePaid(
+  charge: { id: string; paidAtOrder?: boolean },
+  payments: BookingPayment[],
+): boolean {
+  if (charge.paidAtOrder) return true;
+  return payments.some((p) => p.id === `pay-${charge.id}`);
+}
+
+export function sumPendingExtraCharges(
+  charges: { id: string; amount: number; paidAtOrder?: boolean }[] | undefined | null,
+  payments: BookingPayment[],
+): number {
+  return round2(
+    (charges ?? [])
+      .filter((c) => !isExtraChargePaid(c, payments))
+      .reduce((sum, c) => sum + (Number(c.amount) || 0), 0),
+  );
+}
+
+export function sumPaidExtraCharges(
+  charges: { id: string; amount: number; paidAtOrder?: boolean }[] | undefined | null,
+  payments: BookingPayment[],
+): number {
+  return round2(
+    (charges ?? [])
+      .filter((c) => isExtraChargePaid(c, payments))
+      .reduce((sum, c) => sum + (Number(c.amount) || 0), 0),
+  );
+}
+
 export function roomPaymentsOnly(
   payments: BookingPayment[],
-  extraCharges: { id: string }[] | undefined | null,
+  extraCharges: { id: string; paidAtOrder?: boolean }[] | undefined | null,
 ): BookingPayment[] {
-  const extraPaymentIds = new Set((extraCharges ?? []).map((c) => `pay-${c.id}`));
+  const extraPaymentIds = new Set(
+    (extraCharges ?? [])
+      .filter((c) => isExtraChargePaid(c, payments))
+      .map((c) => `pay-${c.id}`),
+  );
   return payments.filter((p) => !extraPaymentIds.has(p.id));
 }
 
@@ -120,7 +154,7 @@ export function computeBookingBill(input: {
 
 export function computeSplitBookingBill(input: {
   roomAmount: number;
-  extraCharges?: { amount: number; id: string }[] | null;
+  extraCharges?: { amount: number; id: string; paidAtOrder?: boolean }[] | null;
   foodAmount?: number;
   roomService?: number;
   discount?: number;
@@ -128,6 +162,8 @@ export function computeSplitBookingBill(input: {
   payments: BookingPayment[];
 }) {
   const extrasTotal = sumExtraCharges(input.extraCharges);
+  const extrasPending = sumPendingExtraCharges(input.extraCharges, input.payments);
+  const extrasPaid = sumPaidExtraCharges(input.extraCharges, input.payments);
   const roomPayments = roomPaymentsOnly(input.payments, input.extraCharges);
   const roomPaid = sumPayments(roomPayments);
   const allPaid = sumPayments(input.payments);
@@ -150,6 +186,8 @@ export function computeSplitBookingBill(input: {
     roomBalance: roomBill.balanceAmount,
     roomPaid,
     extrasTotal,
+    extrasPending,
+    extrasPaid,
     allPaid,
     grandTotal,
     totalAmount: grandTotal,
@@ -201,6 +239,44 @@ export function paymentsByMode(
     map[p.mode] = round2((map[p.mode] ?? 0) + (Number(p.amount) || 0));
   }
   return map;
+}
+
+export type CollectionBucket = 'cash' | 'online' | 'upi' | 'card';
+
+export function paymentCollectionBucket(mode: string): CollectionBucket | null {
+  switch (mode) {
+    case 'Cash':
+      return 'cash';
+    case 'UPI':
+      return 'upi';
+    case 'Online':
+    case 'Bank Transfer':
+      return 'online';
+    case 'Card':
+      return 'card';
+    default:
+      return null;
+  }
+}
+
+export function resolveBookingPayments(booking: Booking): BookingPayment[] {
+  if (booking.payments?.length) return booking.payments;
+  if (booking.paidAmount > 0) {
+    return [
+      {
+        id: `${booking.id}-legacy`,
+        amount: booking.paidAmount,
+        mode: booking.paymentMode,
+        date: booking.checkInDate,
+        note: 'Payment',
+      },
+    ];
+  }
+  return [];
+}
+
+export function isActiveBooking(b: Pick<Booking, 'status'>): boolean {
+  return b.status !== 'Cancelled' && b.status !== 'No Show';
 }
 
 export function calculateBalance(booking: Pick<Booking, 'totalAmount' | 'paidAmount'>): number {

@@ -2,6 +2,8 @@ export type ID = string;
 
 export type PaymentMode = 'Cash' | 'UPI' | 'Online' | 'Card' | 'Bank Transfer' | 'Other';
 
+export type PaymentAccount = 'None' | 'Hotel' | 'Hulla';
+
 export type PaymentStatus = 'PAID' | 'PARTIAL' | 'PENDING' | 'OVERDUE';
 
 export type UserRole = 'Admin' | 'Manager';
@@ -67,12 +69,15 @@ export interface BookingCharge {
   label: string;
   amount: number;
   paymentMode: PaymentMode;
+  account?: PaymentAccount;
+  paidAtOrder?: boolean;
 }
 
 export interface BookingPayment {
   id: ID;
   amount: number;
   mode: PaymentMode;
+  account?: PaymentAccount;
   date: string;
   note?: string;
 }
@@ -185,6 +190,7 @@ export interface Expense {
   supplierName?: string;
   amount: number;
   paymentMode: PaymentMode;
+  account: PaymentAccount;
   reference?: string;
   receiptUrl?: string;
   remarks?: string;

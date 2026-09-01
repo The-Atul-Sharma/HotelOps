@@ -42,6 +42,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (sessionUser?.id === sessionId) {
+        setResolving(false);
+        return;
+      }
+
       const cached = users.find((u) => u.id === sessionId && u.active);
       if (cached) {
         setSessionUser(cached);
@@ -68,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, users, usersLoading]);
+  }, [sessionId, sessionUser, users, usersLoading]);
 
   const login = useCallback(async (username: string, password: string) => {
     const matched = await findUserByCredentials(username, password);
@@ -86,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSessionUser(null);
   }, []);
 
-  const ready = !usersLoading && !resolving;
+  const ready = sessionUser !== null || (!usersLoading && !resolving);
 
   const value = useMemo(
     () => ({

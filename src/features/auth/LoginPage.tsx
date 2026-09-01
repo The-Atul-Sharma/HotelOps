@@ -19,8 +19,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (!ready) return <LoadingState />;
   if (user) return <Navigate to={from} replace />;
+  if (!ready) return <LoadingState />;
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();

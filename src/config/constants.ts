@@ -1,4 +1,5 @@
 import type {
+  PaymentAccount,
   PaymentMode,
   PaymentStatus,
   RoomStatus,
@@ -17,6 +18,14 @@ export const PAYMENT_MODES: PaymentMode[] = [
   'Bank Transfer',
   'Other',
 ];
+
+export const PAYMENT_ACCOUNTS: PaymentAccount[] = ['None', 'Hotel', 'Hulla'];
+
+export const PAYMENT_ACCOUNT_LABELS: Record<PaymentAccount, string> = {
+  None: 'None',
+  Hotel: 'Hotel Account',
+  Hulla: 'Hulla Account',
+};
 
 export const PAYMENT_STATUSES: PaymentStatus[] = ['PAID', 'PARTIAL', 'PENDING', 'OVERDUE'];
 
