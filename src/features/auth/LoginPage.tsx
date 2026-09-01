@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { Hotel } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -12,12 +12,15 @@ import { LoadingState } from '@/components/shared/states';
 export default function LoginPage() {
   const { user, ready, login } = useAuth();
   const { data: settings } = useSettings();
+  const location = useLocation();
+  const from =
+    (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/';
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   if (!ready) return <LoadingState />;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={from} replace />;
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
