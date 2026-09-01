@@ -1,0 +1,513 @@
+import { useEffect, useMemo } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
+import dayjs from 'dayjs';
+import { Trash2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Money } from '@/components/shared/Money';
+import { useConfirm } from '@/components/shared/ConfirmDialog';
+import {
+  useRooms,
+  useBookings,
+  useGuests,
+  useSettings,
+  bookingHooks,
+  guestHooks,
+  notificationHooks,
+} from '@/hooks/useEntities';
+import { calculateNights, computeBookingBill } from '@/utils/finance';
+import { hasConflict } from './bookingUtils';
+import { nextBookingCode } from '@/services/mockData';
+import { PAYMENT_MODES } from '@/config/constants';
+import type { Booking, BookingPayment, PaymentMode } from '@/types';
+
+const FORM_STATUSES = ['Checked In', 'Reserved'] as const;
+
+const schema = z
+  .object({
+    guestName: z.string().min(2, 'Guest name is required'),
+    mobile: z.string().optional(),
+    email: z.string().email('Invalid email').optional().or(z.literal('')),
+    roomId: z.string().min(1, 'Select a room'),
+    checkInDate: z.string().min(1, 'Check-in date required'),
+    checkOutDate: z.string().min(1, 'Check-out date required'),
+    adults: z.coerce.number().int().min(1),
+    children: z.coerce.number().int().min(0),
+    roomTariff: z.coerce.number().min(0, 'Room tariff must be 0 or more'),
+    advanceReceived: z.coerce.number().min(0),
+    paymentMode: z.enum(PAYMENT_MODES as [PaymentMode, ...PaymentMode[]]),
+    status: z.enum(FORM_STATUSES),
+    notes: z.string().optional(),
+  })
+  .refine((d) => dayjs(d.checkOutDate).isAfter(dayjs(d.checkInDate)), {
+    message: 'Check-out must be after check-in',
+    path: ['checkOutDate'],
+  });
+
+type FormValues = z.input<typeof schema>;
+
+export function BookingFormDialog({
+  open,
+  onOpenChange,
+  booking,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  booking?: Booking;
+}) {
+  const { data: rooms = [] } = useRooms();
+  const { data: bookings = [] } = useBookings();
+  const { data: guests = [] } = useGuests();
+  const { data: settings } = useSettings();
+  const createBooking = bookingHooks.useCreate();
+  const updateBooking = bookingHooks.useUpdate();
+  const removeBooking = bookingHooks.useRemove();
+  const createGuest = guestHooks.useCreate();
+  const createNotification = notificationHooks.useCreate();
+  const confirm = useConfirm();
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      guestName: '',
+      mobile: '',
+      email: '',
+      roomId: '',
+      checkInDate: dayjs().format('YYYY-MM-DD'),
+      checkOutDate: dayjs().add(1, 'day').format('YYYY-MM-DD'),
+      adults: 1,
+      children: 0,
+      roomTariff: undefined,
+      advanceReceived: undefined,
+      paymentMode: 'Cash',
+      status: 'Checked In',
+      notes: '',
+    },
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    if (booking) {
+      const status =
+        booking.status === 'Reserved' || booking.status === 'Checked In'
+          ? booking.status
+          : 'Checked In';
+      reset({
+        guestName: booking.guestName,
+        mobile: booking.mobile ?? '',
+        email: booking.email ?? '',
+        roomId: booking.roomId,
+        checkInDate: booking.checkInDate,
+        checkOutDate: booking.checkOutDate,
+        adults: booking.adults,
+        children: booking.children,
+        roomTariff: booking.roomAmount || booking.totalAmount || undefined,
+        advanceReceived: booking.advanceReceived || undefined,
+        paymentMode: booking.paymentMode,
+        status,
+        notes: booking.notes ?? '',
+      });
+    } else {
+      reset({
+        guestName: '',
+        mobile: '',
+        email: '',
+        roomId: '',
+        checkInDate: dayjs().format('YYYY-MM-DD'),
+        checkOutDate: dayjs().add(1, 'day').format('YYYY-MM-DD'),
+        adults: 1,
+        children: 0,
+        roomTariff: undefined,
+        advanceReceived: undefined,
+        paymentMode: 'Cash',
+        status: 'Checked In',
+        notes: '',
+      });
+    }
+  }, [open, booking, reset]);
+
+  const values = watch();
+  const selectedRoom = rooms.find((r) => r.id === values.roomId);
+
+  const calc = useMemo(() => {
+    const nights = calculateNights(values.checkInDate, values.checkOutDate);
+    const roomAmount = Number(values.roomTariff) || 0;
+    const taxPercent = settings?.taxPercent ?? 0;
+    const extras = booking?.extraCharges ?? [];
+    const bill = computeBookingBill({
+      roomAmount,
+      extraCharges: extras,
+      taxPercent,
+      paidAmount: Number(values.advanceReceived) || 0,
+    });
+    return {
+      nights,
+      roomAmount,
+      extrasTotal: bill.otherCharges,
+      taxPercent,
+      taxAmount: bill.taxAmount,
+      totalAmount: bill.totalAmount,
+      balance: bill.balanceAmount,
+    };
+  }, [values, settings?.taxPercent, booking?.extraCharges]);
+
+  const availableRooms = rooms.filter(
+    (r) =>
+      r.active &&
+      !hasConflict(bookings, r.id, values.checkInDate, values.checkOutDate, booking?.id),
+  );
+
+  const onSubmit = async (v: FormValues) => {
+    if (!selectedRoom) return;
+    const conflict = hasConflict(bookings, v.roomId, v.checkInDate, v.checkOutDate, booking?.id);
+    if (conflict) {
+      toast.error(`Room ${selectedRoom.number} is already booked (${conflict.code}) for these dates.`);
+      return;
+    }
+
+    const mobile = (v.mobile ?? '').trim();
+    let guest = mobile ? guests.find((g) => g.mobile === mobile) : undefined;
+    if (!guest) {
+      guest = await createGuest.mutateAsync({
+        name: v.guestName,
+        mobile: mobile || '—',
+        email: v.email || undefined,
+        nationality: 'Indian',
+      });
+    }
+
+    const nights = calculateNights(v.checkInDate, v.checkOutDate);
+    const roomAmount = Number(v.roomTariff) || 0;
+    const advance = Number(v.advanceReceived) || 0;
+    const roomRate = nights > 0 ? Math.round(roomAmount / nights) : roomAmount;
+    const taxPercent = settings?.taxPercent ?? 0;
+    const extraCharges = booking?.extraCharges ?? [];
+    const mode = v.paymentMode as PaymentMode;
+
+    let payments: BookingPayment[];
+    if (booking) {
+      const existing = [...(booking.payments ?? [])];
+      const advanceIdx = existing.findIndex((p) => p.note === 'Advance');
+      if (advance > 0) {
+        if (advanceIdx >= 0) {
+          existing[advanceIdx] = { ...existing[advanceIdx], amount: advance, mode };
+        } else {
+          existing.unshift({
+            id: `pay-${Date.now()}`,
+            amount: advance,
+            mode,
+            date: v.checkInDate,
+            note: 'Advance',
+          });
+        }
+      } else if (advanceIdx >= 0) {
+        existing.splice(advanceIdx, 1);
+      }
+      payments = existing;
+    } else {
+      payments =
+        advance > 0
+          ? [
+              {
+                id: `pay-${Date.now()}`,
+                amount: advance,
+                mode,
+                date: v.checkInDate,
+                note: 'Advance',
+              },
+            ]
+          : [];
+    }
+
+    const paidAmount = booking
+      ? Math.max(0, (booking.paidAmount ?? 0) - (booking.advanceReceived ?? 0) + advance)
+      : advance;
+    const bill = computeBookingBill({
+      roomAmount,
+      extraCharges,
+      taxPercent,
+      paidAmount,
+    });
+
+    const payload: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'> = {
+      code: booking?.code ?? nextBookingCode(bookings),
+      guestId: guest.id,
+      guestName: v.guestName,
+      mobile: mobile || '—',
+      email: v.email || undefined,
+      roomId: v.roomId,
+      roomNumber: selectedRoom.number,
+      roomType: selectedRoom.type || 'Standard',
+      checkInDate: v.checkInDate,
+      checkInTime: '13:00',
+      checkOutDate: v.checkOutDate,
+      checkOutTime: '11:00',
+      adults: Number(v.adults),
+      children: Number(v.children),
+      roomRate,
+      nights,
+      roomAmount,
+      foodAmount: booking?.foodAmount ?? 0,
+      roomService: booking?.roomService ?? 0,
+      otherCharges: bill.otherCharges,
+      extraCharges,
+      discount: booking?.discount ?? 0,
+      taxPercent,
+      taxAmount: bill.taxAmount,
+      totalAmount: bill.totalAmount,
+      advanceReceived: advance,
+      paidAmount,
+      balanceAmount: bill.balanceAmount,
+      paymentMode: mode,
+      payments,
+      status: v.status,
+      notes: v.notes,
+    };
+
+    if (booking) {
+      await updateBooking.mutateAsync({ id: booking.id, patch: payload });
+      toast.success('Booking updated');
+    } else {
+      const created = await createBooking.mutateAsync(payload);
+      createNotification.mutate({
+        type: 'New Booking',
+        title: `New booking ${created.code}`,
+        message: `${created.guestName} · Room ${created.roomNumber}`,
+        read: false,
+      });
+      toast.success('Booking created');
+    }
+    onOpenChange(false);
+  };
+
+  const handleDelete = async () => {
+    if (!booking) return;
+    const ok = await confirm({
+      title: `Delete booking for ${booking.guestName}?`,
+      description: `Room ${booking.roomNumber} · This cannot be undone.`,
+      confirmText: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    await removeBooking.mutateAsync(booking.id);
+    toast.success('Booking deleted');
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl p-0">
+        <DialogHeader className="border-b px-6 py-4">
+          <DialogTitle>{booking ? 'Edit Booking' : 'New Booking'}</DialogTitle>
+        </DialogHeader>
+        <ScrollArea className="max-h-[70vh]">
+          <form
+            id="booking-form"
+            onSubmit={handleSubmit(onSubmit)}
+            className="grid gap-4 px-6 py-4 sm:grid-cols-2"
+          >
+            <Field label="Guest Name" error={errors.guestName?.message}>
+              <Input {...register('guestName')} placeholder="Full name" />
+            </Field>
+            <Field label="Mobile (optional)" error={errors.mobile?.message}>
+              <Input {...register('mobile')} placeholder="+91 …" />
+            </Field>
+            <Field label="Email" error={errors.email?.message}>
+              <Input {...register('email')} placeholder="optional" />
+            </Field>
+            <Field label="Status">
+              <Select
+                value={values.status}
+                onValueChange={(v) => setValue('status', v as (typeof FORM_STATUSES)[number])}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FORM_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <Field label="Room Number" error={errors.roomId?.message} className="sm:col-span-2">
+              <Select value={values.roomId} onValueChange={(v) => setValue('roomId', v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select room number" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableRooms.length === 0 && (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                      No rooms free for these dates
+                    </div>
+                  )}
+                  {availableRooms.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.number} · Floor {r.floor}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <Field label="Check-in Date" error={errors.checkInDate?.message}>
+              <Input type="date" {...register('checkInDate')} />
+            </Field>
+            <Field label="Check-out Date" error={errors.checkOutDate?.message}>
+              <Input type="date" {...register('checkOutDate')} />
+            </Field>
+            <Field label="Adults">
+              <Input type="number" {...register('adults')} />
+            </Field>
+            <Field label="Children">
+              <Input type="number" {...register('children')} />
+            </Field>
+            <Field label="Room Tariff incl. GST (₹)" error={errors.roomTariff?.message}>
+              <Input type="number" {...register('roomTariff')} placeholder="Amount including GST" />
+            </Field>
+            <Field label="Advance Received (₹)">
+              <Input type="number" {...register('advanceReceived')} />
+            </Field>
+            <Field label="Payment Mode">
+              <Select
+                value={values.paymentMode}
+                onValueChange={(v) => setValue('paymentMode', v as PaymentMode)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_MODES.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <Field label="Notes" className="sm:col-span-2">
+              <Textarea {...register('notes')} rows={2} placeholder="Special requests…" />
+            </Field>
+
+            <div className="rounded-lg border bg-muted/40 p-4 sm:col-span-2">
+              <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                <Summary label="Nights" value={calc.nights} isCount />
+                <Summary label="Room (incl. GST)" value={calc.roomAmount} />
+                <Summary label="Total" value={calc.totalAmount} strong />
+                <Summary label="Balance" value={calc.balance} strong danger={calc.balance > 0} />
+              </div>
+              {calc.taxPercent > 0 && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  GST {calc.taxPercent}% included in room · Tax ₹{calc.taxAmount}
+                  {calc.extrasTotal > 0 ? ` · Extras ₹${calc.extrasTotal} (no GST)` : ''}
+                </p>
+              )}
+              {calc.taxPercent <= 0 && calc.extrasTotal > 0 && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Includes extras ₹{calc.extrasTotal} (manage on booking detail)
+                </p>
+              )}
+            </div>
+          </form>
+        </ScrollArea>
+        <DialogFooter className="border-t px-6 py-4 sm:justify-between">
+          {booking ? (
+            <Button
+              type="button"
+              variant="destructive"
+              className="gap-1.5"
+              onClick={handleDelete}
+              disabled={removeBooking.isPending}
+            >
+              <Trash2 className="h-4 w-4" /> Delete
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="booking-form">
+              {booking ? 'Save Changes' : 'Create Booking'}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Field({
+  label,
+  error,
+  children,
+  className,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <Label className="mb-1.5 block text-xs">{label}</Label>
+      {children}
+      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+function Summary({
+  label,
+  value,
+  strong,
+  danger,
+  isCount,
+}: {
+  label: string;
+  value: number;
+  strong?: boolean;
+  danger?: boolean;
+  isCount?: boolean;
+}) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={strong ? 'text-base font-semibold' : 'font-medium'}>
+        {isCount ? value : <Money value={value} colored={danger} muteZero={false} />}
+      </p>
+    </div>
+  );
+}
