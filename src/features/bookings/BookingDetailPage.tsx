@@ -28,8 +28,7 @@ import {
 import { useConfirm } from '@/components/shared/ConfirmDialog';
 import {
   calculatePaymentStatus,
-  calculatePendingAmount,
-  computeBookingBill,
+  computeSplitBookingBill,
   paymentsByMode,
   roomPaymentsOnly,
   sumPayments,
@@ -91,20 +90,21 @@ export default function BookingDetailPage() {
         : [];
   const paidTotal = payments.length ? sumPayments(payments) : booking.paidAmount;
   const billPayments = roomPaymentsOnly(payments, extraCharges);
-  const modeTotals = paymentsByMode(payments);
+  const roomModeTotals = paymentsByMode(billPayments);
   const taxPercent =
     booking.taxPercent > 0 ? booking.taxPercent : (settings?.taxPercent ?? 0);
-  const bill = computeBookingBill({
+  const bill = computeSplitBookingBill({
     roomAmount: roomTotal,
     extraCharges,
     foodAmount: booking.foodAmount,
     roomService: booking.roomService,
     discount: booking.discount,
     taxPercent,
-    paidAmount: paidTotal,
+    payments,
   });
-  const { taxAmount, totalAmount: grandTotal, balanceAmount: balance } = bill;
-  const status = calculatePaymentStatus(grandTotal, paidTotal);
+  const { taxAmount, roomTotal: roomBillTotal, roomBalance: balance, extrasTotal, grandTotal } =
+    bill;
+  const status = calculatePaymentStatus(roomBillTotal, bill.roomPaid);
 
   const persistBill = async (
     nextExtras: BookingCharge[],
@@ -112,14 +112,14 @@ export default function BookingDetailPage() {
     patch: Partial<typeof booking> = {},
   ) => {
     const paid = sumPayments(nextPayments);
-    const nextBill = computeBookingBill({
+    const nextBill = computeSplitBookingBill({
       roomAmount: roomTotal,
       extraCharges: nextExtras,
       foodAmount: booking.foodAmount,
       roomService: booking.roomService,
       discount: booking.discount,
       taxPercent,
-      paidAmount: paid,
+      payments: nextPayments,
     });
     const lastMode =
       nextPayments.length > 0
@@ -153,7 +153,17 @@ export default function BookingDetailPage() {
       ...extraCharges,
       { id: chargeId, label, amount, paymentMode: chargeMode },
     ];
-    await persistBill(next, payments);
+    const nextPayments: BookingPayment[] = [
+      ...payments,
+      {
+        id: `pay-${chargeId}`,
+        amount,
+        mode: chargeMode,
+        date: dayjs().format('YYYY-MM-DD'),
+        note: label,
+      },
+    ];
+    await persistBill(next, nextPayments);
     setChargeLabel('');
     setChargeAmount('');
     setChargeMode('Cash');
@@ -169,7 +179,8 @@ export default function BookingDetailPage() {
     });
     if (!ok) return;
     const next = extraCharges.filter((c) => c.id !== charge.id);
-    await persistBill(next, payments);
+    const nextPayments = payments.filter((p) => p.id !== `pay-${charge.id}`);
+    await persistBill(next, nextPayments);
     toast.success('Charge removed');
   };
 
@@ -220,10 +231,9 @@ export default function BookingDetailPage() {
   };
 
   const checkOut = async () => {
-    const due = calculatePendingAmount(grandTotal, paidTotal);
-    if (due > 0) {
+    if (balance > 0) {
       toast.error(
-        `Cannot check out — ₹${due} still pending. Collect full payment first.`,
+        `Cannot check out — ₹${balance} room rent still pending. Collect full payment first.`,
       );
       return;
     }
@@ -235,7 +245,7 @@ export default function BookingDetailPage() {
         taxAmount,
         totalAmount: grandTotal,
         paidAmount: paidTotal,
-        balanceAmount: 0,
+        balanceAmount: balance,
         otherCharges: bill.otherCharges,
         extraCharges,
         payments,
@@ -323,20 +333,48 @@ export default function BookingDetailPage() {
             <Row label="Room Tariff (incl. GST)" value={roomTotal} />
             {taxPercent > 0 && (
               <>
-                <Row label={`  Taxable`} value={bill.taxable} />
+                <Row label="  Taxable" value={bill.taxable} />
                 <Row label={`  GST (${taxPercent}%)`} value={taxAmount} />
               </>
             )}
-            {extraCharges.map((c) => (
-              <Row key={c.id} label={`${c.label} (${c.paymentMode ?? 'Cash'})`} value={c.amount} />
-            ))}
+            {(booking.foodAmount > 0 || booking.roomService > 0) && (
+              <>
+                {booking.foodAmount > 0 && <Row label="Food" value={booking.foodAmount} />}
+                {booking.roomService > 0 && (
+                  <Row label="Room Service" value={booking.roomService} />
+                )}
+              </>
+            )}
             <div className="my-2 border-t" />
-            <Row label="Total" value={grandTotal} strong />
-            <Row label="Paid" value={paidTotal} />
-            {Object.entries(modeTotals).map(([mode, amt]) => (
+            <Row label="Total" value={roomBillTotal} strong />
+            <Row label="Paid" value={bill.roomPaid} />
+            {Object.entries(roomModeTotals).map(([mode, amt]) => (
               <Row key={mode} label={`  ${mode}`} value={amt} />
             ))}
-            <Row label="Balance" value={balance} strong danger />
+            <Row label="Due" value={balance} strong danger />
+            {extraCharges.length > 0 && (
+              <>
+                <div className="my-2 border-t" />
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Extra Charges
+                </p>
+                {extraCharges.map((c) => (
+                  <Row
+                    key={c.id}
+                    label={`${c.label} (${c.paymentMode ?? 'Cash'})`}
+                    value={c.amount}
+                  />
+                ))}
+                <Row label="Extras Total" value={extrasTotal} strong />
+                <p className="text-xs text-muted-foreground">Paid on collection · not in room due</p>
+              </>
+            )}
+            {extraCharges.length > 0 && (
+              <>
+                <div className="my-2 border-t" />
+                <Row label="Grand Total" value={grandTotal} strong />
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -433,7 +471,7 @@ export default function BookingDetailPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              Room rent and balance collections only — extras are added above, then paid here.
+              Room rent collections only — extras are paid when added above.
             </p>
             <div className="flex flex-wrap items-end gap-3">
               <div className="min-w-[120px] flex-1">

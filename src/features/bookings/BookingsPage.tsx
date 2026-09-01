@@ -23,7 +23,7 @@ import { usePagination } from '@/hooks/usePagination';
 import { useConfirm } from '@/components/shared/ConfirmDialog';
 import { DateRangeFilter } from '@/components/shared/DateRangeFilter';
 import { BookingFormDialog } from './BookingFormDialog';
-import { calculatePaymentStatus } from '@/utils/finance';
+import { calculatePaymentStatus, sumExtraCharges } from '@/utils/finance';
 import { formatDate } from '@/utils/format';
 import { inRange } from '@/utils/dateRange';
 import { useDateRange } from '@/hooks/useDateRange';
@@ -143,8 +143,10 @@ export default function BookingsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Guest</TableHead>
+                  <TableHead className="text-center">Guests</TableHead>
                   <TableHead className="text-center">Room</TableHead>
                   <TableHead>Stay</TableHead>
+                  <TableHead className="text-right">Extras</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead className="text-right">Balance</TableHead>
                   <TableHead>Payment</TableHead>
@@ -161,10 +163,14 @@ export default function BookingsPage() {
                         {b.mobile && b.mobile !== '—' ? b.mobile : '—'}
                       </div>
                     </TableCell>
+                    <TableCell className="text-center">{b.adults + b.children}</TableCell>
                     <TableCell className="text-center">{b.roomNumber}</TableCell>
                     <TableCell className="whitespace-nowrap text-sm">
                       {formatDate(b.checkInDate, 'DD MMM')} → {formatDate(b.checkOutDate, 'DD MMM')}
                       <span className="ml-1 text-xs text-muted-foreground">({b.nights}n)</span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Money value={sumExtraCharges(b.extraCharges)} />
                     </TableCell>
                     <TableCell className="text-right">
                       <Money value={b.totalAmount} />

@@ -118,6 +118,46 @@ export function computeBookingBill(input: {
   };
 }
 
+export function computeSplitBookingBill(input: {
+  roomAmount: number;
+  extraCharges?: { amount: number; id: string }[] | null;
+  foodAmount?: number;
+  roomService?: number;
+  discount?: number;
+  taxPercent: number;
+  payments: BookingPayment[];
+}) {
+  const extrasTotal = sumExtraCharges(input.extraCharges);
+  const roomPayments = roomPaymentsOnly(input.payments, input.extraCharges);
+  const roomPaid = sumPayments(roomPayments);
+  const allPaid = sumPayments(input.payments);
+
+  const roomBill = computeBookingBill({
+    roomAmount: input.roomAmount,
+    extraCharges: [],
+    foodAmount: input.foodAmount,
+    roomService: input.roomService,
+    discount: input.discount,
+    taxPercent: input.taxPercent,
+    paidAmount: roomPaid,
+  });
+
+  const grandTotal = round2(roomBill.totalAmount + extrasTotal);
+
+  return {
+    ...roomBill,
+    roomTotal: roomBill.totalAmount,
+    roomBalance: roomBill.balanceAmount,
+    roomPaid,
+    extrasTotal,
+    allPaid,
+    grandTotal,
+    totalAmount: grandTotal,
+    balanceAmount: roomBill.balanceAmount,
+    otherCharges: extrasTotal,
+  };
+}
+
 export function calculatePendingAmount(totalAmount: number, paidAmount: number): number {
   return round2(Math.max(totalAmount - paidAmount, 0));
 }
