@@ -1,5 +1,3 @@
-# Hotel Decent Inn
-
 **Hotel Management & Accounts System** — a modern, responsive web app (and installable PWA) that replaces an Excel-based hotel register while keeping the familiar spreadsheet workflow.
 
 ## Tech Stack
@@ -59,8 +57,8 @@ Without Supabase env vars, the app uses browser **localStorage** (same as before
 
 After `npm run build` and serving the `dist` folder (or deploying to HTTPS):
 
-- **Chrome / Edge** — address bar install icon or menu → *Install Hotel Decent Inn*
-- **Safari (iOS)** — Share → *Add to Home Screen*
+- **Chrome / Edge** — address bar install icon or menu → _Install Hotel Decent Inn_
+- **Safari (iOS)** — Share → _Add to Home Screen_
 - **Android** — browser prompt to install the app
 
 The installed app name is **Hotel Decent Inn** (short name: **Decent Inn**).
