@@ -495,7 +495,7 @@ export default function BookingDetailPage() {
                 const paid = isExtraChargePaid(c, payments);
                 const collectMode = collectModes[c.id] ?? c.paymentMode;
                 return (
-                  <div key={c.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <div key={c.id} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{c.label}</p>
                       <p className="text-xs text-muted-foreground">
@@ -503,7 +503,7 @@ export default function BookingDetailPage() {
                         {paid ? ` · Paid · ${c.paymentMode}${c.account && c.account !== 'None' ? ` · ${PAYMENT_ACCOUNT_LABELS[c.account]}` : ''}` : ' · Pending'}
                       </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">
                       {!paid && (
                         <>
                           <Select
@@ -512,7 +512,7 @@ export default function BookingDetailPage() {
                               setCollectModes((prev) => ({ ...prev, [c.id]: v as PaymentMode }))
                             }
                           >
-                            <SelectTrigger className="h-8 w-[100px] text-xs">
+                            <SelectTrigger className="h-8 w-[calc(50%-0.1875rem)] text-xs sm:w-[100px]">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -529,7 +529,7 @@ export default function BookingDetailPage() {
                               setCollectAccounts((prev) => ({ ...prev, [c.id]: v as PaymentAccount }))
                             }
                           >
-                            <SelectTrigger className="h-8 w-[110px] text-xs">
+                            <SelectTrigger className="h-8 w-[calc(50%-0.1875rem)] text-xs sm:w-[110px]">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -543,7 +543,7 @@ export default function BookingDetailPage() {
                           <Button
                             size="sm"
                             variant="secondary"
-                            className="h-8"
+                            className="h-8 flex-1 sm:flex-none"
                             onClick={() => collectExtraCharge(c)}
                           >
                             Collect
@@ -553,7 +553,7 @@ export default function BookingDetailPage() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="h-8 w-8 text-destructive"
+                        className="h-8 w-8 shrink-0 text-destructive"
                         onClick={() => removeExtraCharge(c)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -722,9 +722,9 @@ function Row({
   danger?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <span className={strong ? 'font-semibold' : 'text-muted-foreground'}>{label}</span>
-      <Money value={value} className={strong ? 'font-semibold' : ''} colored={danger} muteZero={false} />
+    <div className="flex items-start justify-between gap-2">
+      <span className={`min-w-0 flex-1 ${strong ? 'font-semibold' : 'text-muted-foreground'}`}>{label}</span>
+      <Money value={value} className={`shrink-0 ${strong ? 'font-semibold' : ''}`} colored={danger} muteZero={false} />
     </div>
   );
 }

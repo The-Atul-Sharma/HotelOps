@@ -166,12 +166,12 @@ export function BookingCheckoutDialog({
               {extraCharges.map((c) => {
                 const paid = isExtraChargePaid(c, payments);
                 return (
-                  <div key={c.id} className="flex justify-between gap-2">
-                    <span className={paid ? 'text-muted-foreground' : 'text-destructive'}>
+                  <div key={c.id} className="flex items-start justify-between gap-2">
+                    <span className={`min-w-0 flex-1 ${paid ? 'text-muted-foreground' : 'text-destructive'}`}>
                       {c.label}
                       {paid ? ` (${c.paymentMode})` : ' · Pending'}
                     </span>
-                    <Money value={c.amount} muteZero={false} />
+                    <Money value={c.amount} className="shrink-0" muteZero={false} />
                   </div>
                 );
               })}
@@ -199,63 +199,67 @@ export function BookingCheckoutDialog({
                 {pendingExtras.map((c) => (
                   <div
                     key={c.id}
-                    className="flex items-center gap-3 rounded-lg border px-3 py-2.5"
+                    className="flex flex-col gap-2 rounded-lg border px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3"
                   >
-                    <Checkbox
-                      checked={settleIds.has(c.id)}
-                      onCheckedChange={(checked) => {
-                        setSettleIds((prev) => {
-                          const next = new Set(prev);
-                          if (checked) next.add(c.id);
-                          else next.delete(c.id);
-                          return next;
-                        });
-                      }}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium">{c.label}</p>
-                      <p className="text-xs text-muted-foreground">
-                        <Money value={c.amount} muteZero={false} />
-                      </p>
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                      <Checkbox
+                        checked={settleIds.has(c.id)}
+                        onCheckedChange={(checked) => {
+                          setSettleIds((prev) => {
+                            const next = new Set(prev);
+                            if (checked) next.add(c.id);
+                            else next.delete(c.id);
+                            return next;
+                          });
+                        }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium">{c.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          <Money value={c.amount} muteZero={false} />
+                        </p>
+                      </div>
                     </div>
-                    <Select
-                      value={collectModes[c.id] ?? c.paymentMode}
-                      onValueChange={(v) => {
-                        const mode = v as PaymentMode;
-                        setCollectModes((prev) => ({ ...prev, [c.id]: mode }));
-                        if (mode === 'Cash') {
-                          setCollectAccounts((prev) => ({ ...prev, [c.id]: 'None' }));
+                    <div className="flex gap-1.5 pl-7 sm:shrink-0 sm:pl-0">
+                      <Select
+                        value={collectModes[c.id] ?? c.paymentMode}
+                        onValueChange={(v) => {
+                          const mode = v as PaymentMode;
+                          setCollectModes((prev) => ({ ...prev, [c.id]: mode }));
+                          if (mode === 'Cash') {
+                            setCollectAccounts((prev) => ({ ...prev, [c.id]: 'None' }));
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-8 w-[calc(50%-0.1875rem)] text-xs sm:w-[110px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PAYMENT_MODES.map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {m}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={collectAccounts[c.id] ?? c.account ?? 'None'}
+                        onValueChange={(v) =>
+                          setCollectAccounts((prev) => ({ ...prev, [c.id]: v as PaymentAccount }))
                         }
-                      }}
-                    >
-                      <SelectTrigger className="h-8 w-[110px] shrink-0 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PAYMENT_MODES.map((m) => (
-                          <SelectItem key={m} value={m}>
-                            {m}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={collectAccounts[c.id] ?? c.account ?? 'None'}
-                      onValueChange={(v) =>
-                        setCollectAccounts((prev) => ({ ...prev, [c.id]: v as PaymentAccount }))
-                      }
-                    >
-                      <SelectTrigger className="h-8 w-[100px] shrink-0 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PAYMENT_ACCOUNTS.map((a) => (
-                          <SelectItem key={a} value={a}>
-                            {PAYMENT_ACCOUNT_LABELS[a]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      >
+                        <SelectTrigger className="h-8 w-[calc(50%-0.1875rem)] text-xs sm:w-[100px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PAYMENT_ACCOUNTS.map((a) => (
+                            <SelectItem key={a} value={a}>
+                              {PAYMENT_ACCOUNT_LABELS[a]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 ))}
               </div>
