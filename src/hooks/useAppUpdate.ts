@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
-
-const UPDATE_CHECK_MS = 30_000;
-
-function isStandalonePwa() {
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true
-  );
-}
+import { router } from '@/router';
 
 function hasWaitingWorker(registration?: ServiceWorkerRegistration) {
   return Boolean(registration?.waiting && navigator.serviceWorker.controller);
@@ -117,25 +109,29 @@ export function useAppUpdate() {
   useEffect(() => {
     void checkForUpdates();
 
-    const interval = window.setInterval(() => void checkForUpdates(), UPDATE_CHECK_MS);
     const onResume = () => void checkForUpdates();
 
     window.addEventListener('focus', onResume);
     window.addEventListener('pageshow', onResume);
+    window.addEventListener('online', onResume);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') onResume();
     });
 
+    const unsubscribe = router.subscribe(() => {
+      void checkForUpdates();
+    });
+
     return () => {
-      window.clearInterval(interval);
       window.removeEventListener('focus', onResume);
       window.removeEventListener('pageshow', onResume);
+      window.removeEventListener('online', onResume);
+      unsubscribe();
     };
   }, [checkForUpdates]);
 
   return {
     updateAvailable,
     applyUpdate,
-    isStandalonePwa: isStandalonePwa(),
   };
 }
