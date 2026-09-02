@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
+import { PwaUpdatePrompt } from '@/components/PwaUpdatePrompt';
 import { ThemeProvider } from '@/hooks/useTheme';
 import { AuthProvider } from '@/hooks/useAuth';
 import { ConfirmProvider } from '@/components/shared/ConfirmDialog';
@@ -34,6 +35,7 @@ async function startApp() {
             <ConfirmProvider>
               <RouterProvider router={router} />
               <Toaster richColors position="top-right" />
+              <PwaUpdatePrompt />
             </ConfirmProvider>
           </AuthProvider>
         </QueryClientProvider>
