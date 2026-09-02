@@ -1,79 +1,50 @@
 import { useEffect, useState } from 'react';
 import { Hotel, RefreshCw } from 'lucide-react';
-import { useRegisterSW } from 'virtual:pwa-register/react';
 import { Button } from '@/components/ui/button';
-
-const UPDATE_CHECK_MS = 60_000;
+import { useAppUpdate } from '@/hooks/useAppUpdate';
 
 export function PwaUpdatePrompt() {
-  const [registration, setRegistration] = useState<ServiceWorkerRegistration>();
-  const {
-    needRefresh: [needRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
-    onRegisteredSW(_swUrl, reg) {
-      if (reg) setRegistration(reg);
-    },
-  });
+  const { updateAvailable, applyUpdate } = useAppUpdate();
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
-    if (!registration) return;
-
-    const checkForUpdates = () => {
-      if (registration.installing || registration.waiting) return;
-      void registration.update();
-    };
-
-    const interval = window.setInterval(checkForUpdates, UPDATE_CHECK_MS);
-    const onFocus = () => checkForUpdates();
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') checkForUpdates();
-    };
-
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onVisibilityChange);
-
+    if (!updateAvailable) return;
+    document.body.style.overflow = 'hidden';
     return () => {
-      window.clearInterval(interval);
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
+      document.body.style.overflow = '';
     };
-  }, [registration]);
+  }, [updateAvailable]);
 
-  useEffect(() => {
-    if (!needRefresh) return;
-    document.body.style.paddingBottom = '4.5rem';
-    return () => {
-      document.body.style.paddingBottom = '';
-    };
-  }, [needRefresh]);
+  if (!updateAvailable) return null;
 
-  if (!needRefresh) return null;
+  const handleUpdate = async () => {
+    setUpdating(true);
+    await applyUpdate();
+  };
 
   return (
     <div
-      role="alert"
-      className="fixed inset-x-0 bottom-0 z-50 flex items-center justify-between gap-3 border-t bg-card px-4 py-3 shadow-lg sm:px-6"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="pwa-update-title"
+      aria-describedby="pwa-update-description"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-background/95 p-6 backdrop-blur-sm"
     >
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <Hotel className="h-4 w-4" />
+      <div className="w-full max-w-sm rounded-xl border bg-card p-6 text-center shadow-lg">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+          <Hotel className="h-7 w-7" />
         </div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium">Update available</p>
-          <p className="truncate text-xs text-muted-foreground">
-            A new version of HotelFlow is ready. Refresh to get the latest changes.
-          </p>
-        </div>
+        <h2 id="pwa-update-title" className="text-lg font-semibold">
+          Update required
+        </h2>
+        <p id="pwa-update-description" className="mt-2 text-sm text-muted-foreground">
+          A new version of HotelFlow is available. You must update to continue using the app.
+        </p>
+        <Button className="mt-6 w-full" size="lg" disabled={updating} onClick={() => void handleUpdate()}>
+          <RefreshCw className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
+          {updating ? 'Updating...' : 'Update app'}
+        </Button>
       </div>
-      <Button
-        size="sm"
-        className="shrink-0"
-        onClick={() => void updateServiceWorker(true)}
-      >
-        <RefreshCw className="h-4 w-4" />
-        Update app
-      </Button>
     </div>
   );
 }

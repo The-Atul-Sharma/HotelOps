@@ -3,8 +3,14 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
+import { writeFileSync } from 'node:fs';
+
+const buildId = `${Date.now()}`;
 
 export default defineConfig({
+  define: {
+    __BUILD_ID__: JSON.stringify(buildId),
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -52,8 +58,18 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,svg,png,woff2}'],
         navigateFallback: '/index.html',
+        cleanupOutdatedCaches: true,
       },
     }),
+    {
+      name: 'app-version',
+      closeBundle() {
+        writeFileSync(
+          path.resolve(import.meta.dirname, 'dist/version.json'),
+          JSON.stringify({ version: buildId }),
+        );
+      },
+    },
   ],
   resolve: {
     alias: {
