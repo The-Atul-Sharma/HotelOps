@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -39,10 +39,15 @@ import { calculateNights, computeBookingBill, round2 } from '@/utils/finance';
 import { formatRoomTariffLabel } from '@/utils/format';
 import { hasConflict } from './bookingUtils';
 import { nextBookingCode } from '@/services/mockData';
-import { PAYMENT_MODES, PAYMENT_ACCOUNTS, PAYMENT_ACCOUNT_LABELS } from '@/config/constants';
+import { PAYMENT_MODES, PAYMENT_ACCOUNTS, formatPaymentAccount } from '@/config/constants';
 import type { Booking, BookingPayment, PaymentAccount, PaymentMode } from '@/types';
 
 const FORM_STATUSES = ['Checked In', 'Reserved'] as const;
+
+const optionalAmount = z.preprocess(
+  (v) => (v === '' || v === null || v === undefined ? 0 : v),
+  z.coerce.number().min(0),
+);
 
 const schema = z
   .object({
@@ -54,8 +59,8 @@ const schema = z
     checkOutDate: z.string().min(1, 'Check-out date required'),
     adults: z.coerce.number().int().min(1),
     children: z.coerce.number().int().min(0),
-    roomTariff: z.coerce.number().min(0, 'Room tariff must be 0 or more'),
-    advanceReceived: z.coerce.number().min(0),
+    roomTariff: optionalAmount,
+    advanceReceived: optionalAmount,
     paymentMode: z.enum(PAYMENT_MODES as [PaymentMode, ...PaymentMode[]]),
     paymentAccount: z.enum(PAYMENT_ACCOUNTS as [PaymentAccount, ...PaymentAccount[]]),
     status: z.enum(FORM_STATUSES),
@@ -87,6 +92,10 @@ export function BookingFormDialog({
   const createGuest = guestHooks.useCreate();
   const createNotification = notificationHooks.useCreate();
   const confirm = useConfirm();
+  const submittingRef = useRef(false);
+
+  const isSaving =
+    createBooking.isPending || updateBooking.isPending || createGuest.isPending;
 
   const {
     register,
@@ -157,6 +166,7 @@ export function BookingFormDialog({
         roomTariff: undefined,
         advanceReceived: undefined,
         paymentMode: 'Cash',
+        paymentAccount: 'None',
         status: 'Checked In',
         notes: '',
       });
@@ -197,7 +207,13 @@ export function BookingFormDialog({
   );
 
   const onSubmit = async (v: FormValues) => {
-    if (!selectedRoom) return;
+    if (submittingRef.current || isSaving) return;
+    if (!selectedRoom) {
+      toast.error('Select a room');
+      return;
+    }
+    submittingRef.current = true;
+    try {
     const conflict = hasConflict(bookings, v.roomId, v.checkInDate, v.checkOutDate, booking?.id);
     if (conflict) {
       toast.error(`Room ${selectedRoom.number} is already booked (${conflict.code}) for these dates.`);
@@ -205,10 +221,15 @@ export function BookingFormDialog({
     }
 
     const mobile = (v.mobile ?? '').trim();
-    let guest = mobile ? guests.find((g) => g.mobile === mobile) : undefined;
+    const guestName = v.guestName.trim();
+    let guest = mobile
+      ? guests.find((g) => g.mobile === mobile)
+      : guests.find(
+          (g) => g.name.toLowerCase() === guestName.toLowerCase() && g.mobile === '—',
+        );
     if (!guest) {
       guest = await createGuest.mutateAsync({
-        name: v.guestName,
+        name: guestName,
         mobile: mobile || '—',
         email: v.email || undefined,
         nationality: 'Indian',
@@ -320,6 +341,11 @@ export function BookingFormDialog({
       toast.success('Booking created');
     }
     onOpenChange(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not save booking');
+    } finally {
+      submittingRef.current = false;
+    }
   };
 
   const handleDelete = async () => {
@@ -413,44 +439,46 @@ export function BookingFormDialog({
             <Field label="Advance Received (₹)">
               <Input type="number" {...register('advanceReceived')} />
             </Field>
-            <Field label="Payment Mode">
-              <Select
-                value={values.paymentMode}
-                onValueChange={(v) => {
-                  const mode = v as PaymentMode;
-                  setValue('paymentMode', mode);
-                  if (mode === 'Cash') setValue('paymentAccount', 'None');
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_MODES.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Account">
-              <Select
-                value={values.paymentAccount}
-                onValueChange={(v) => setValue('paymentAccount', v as PaymentAccount)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_ACCOUNTS.map((a) => (
-                    <SelectItem key={a} value={a}>
-                      {PAYMENT_ACCOUNT_LABELS[a]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
+            <div className="grid grid-cols-2 gap-4 sm:contents">
+              <Field label="Payment Mode">
+                <Select
+                  value={values.paymentMode}
+                  onValueChange={(v) => {
+                    const mode = v as PaymentMode;
+                    setValue('paymentMode', mode);
+                    if (mode === 'Cash') setValue('paymentAccount', 'None');
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_MODES.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Account">
+                <Select
+                  value={values.paymentAccount}
+                  onValueChange={(v) => setValue('paymentAccount', v as PaymentAccount)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_ACCOUNTS.map((a) => (
+                      <SelectItem key={a} value={a}>
+                        {formatPaymentAccount(a)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
 
             <Field label="Notes" className="sm:col-span-2">
               <Textarea {...register('notes')} rows={2} placeholder="Special requests…" />
@@ -495,8 +523,8 @@ export function BookingFormDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" form="booking-form">
-              {booking ? 'Save Changes' : 'Create Booking'}
+            <Button type="submit" form="booking-form" disabled={isSaving}>
+              {isSaving ? 'Saving…' : booking ? 'Save Changes' : 'Create Booking'}
             </Button>
           </div>
         </DialogFooter>

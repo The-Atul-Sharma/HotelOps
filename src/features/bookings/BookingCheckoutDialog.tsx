@@ -19,9 +19,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { bookingHooks } from '@/hooks/useEntities';
-import { PAYMENT_MODES, PAYMENT_ACCOUNTS, PAYMENT_ACCOUNT_LABELS } from '@/config/constants';
+import { PAYMENT_MODES, PAYMENT_ACCOUNTS, formatPaymentAccount } from '@/config/constants';
 import { isExtraChargePaid } from '@/utils/finance';
 import { formatINR, formatRoomTariffLabel } from '@/utils/format';
+import { formatExtraChargeDetail, formatExtraChargeLabel } from './bookingUtils';
 import type { Booking, PaymentAccount, PaymentMode } from '@/types';
 import {
   buildCheckoutPatch,
@@ -168,7 +169,7 @@ export function BookingCheckoutDialog({
                 return (
                   <div key={c.id} className="flex items-start justify-between gap-2">
                     <span className={`min-w-0 flex-1 ${paid ? 'text-muted-foreground' : 'text-destructive'}`}>
-                      {c.label}
+                      {formatExtraChargeLabel(c)}
                       {paid ? ` (${c.paymentMode})` : ' · Pending'}
                     </span>
                     <Money value={c.amount} className="shrink-0" muteZero={false} />
@@ -214,13 +215,13 @@ export function BookingCheckoutDialog({
                         }}
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium">{c.label}</p>
+                        <p className="font-medium">{formatExtraChargeLabel(c)}</p>
                         <p className="text-xs text-muted-foreground">
-                          <Money value={c.amount} muteZero={false} />
+                          {formatExtraChargeDetail(c)}
                         </p>
                       </div>
                     </div>
-                    <div className="flex gap-1.5 pl-7 sm:shrink-0 sm:pl-0">
+                    <div className="grid w-full grid-cols-2 gap-2 pl-7 sm:w-auto sm:shrink-0 sm:pl-0">
                       <Select
                         value={collectModes[c.id] ?? c.paymentMode}
                         onValueChange={(v) => {
@@ -231,7 +232,7 @@ export function BookingCheckoutDialog({
                           }
                         }}
                       >
-                        <SelectTrigger className="h-8 w-[calc(50%-0.1875rem)] text-xs sm:w-[110px]">
+                        <SelectTrigger className="h-9 w-full text-xs sm:h-8">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -248,13 +249,13 @@ export function BookingCheckoutDialog({
                           setCollectAccounts((prev) => ({ ...prev, [c.id]: v as PaymentAccount }))
                         }
                       >
-                        <SelectTrigger className="h-8 w-[calc(50%-0.1875rem)] text-xs sm:w-[100px]">
+                        <SelectTrigger className="h-9 w-full text-xs sm:h-8">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {PAYMENT_ACCOUNTS.map((a) => (
                             <SelectItem key={a} value={a}>
-                              {PAYMENT_ACCOUNT_LABELS[a]}
+                              {formatPaymentAccount(a)}
                             </SelectItem>
                           ))}
                         </SelectContent>

@@ -2,7 +2,17 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Printer, Pencil, LogIn, LogOut, FileText, Plus, Trash2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Printer,
+  Pencil,
+  LogIn,
+  LogOut,
+  FileText,
+  Plus,
+  Trash2,
+  MoreHorizontal,
+} from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { LoadingState, EmptyState } from '@/components/shared/states';
 import { BookingStatusBadge, PaymentStatusBadge } from '@/components/shared/StatusBadge';
@@ -12,6 +22,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
@@ -35,14 +51,16 @@ import {
   paymentsByMode,
   roomPaymentsOnly,
   sumPayments,
+  round2,
 } from '@/utils/finance';
 import { formatDate, formatINR, formatRoomTariffLabel } from '@/utils/format';
 import { BookingFormDialog } from './BookingFormDialog';
 import { BookingCheckoutDialog } from './BookingCheckoutDialog';
 import { buildSettledExtras } from './bookingCheckout';
+import { buildExtraCharge, formatExtraChargeLabel, extraChargeName, recalculateExtraCharge } from './bookingUtils';
 import { Invoice } from './Invoice';
-import { PAYMENT_MODES, PAYMENT_ACCOUNTS, PAYMENT_ACCOUNT_LABELS } from '@/config/constants';
-import type { BookingCharge, BookingPayment, PaymentAccount, PaymentMode } from '@/types';
+import { PAYMENT_MODES, PAYMENT_ACCOUNTS, formatPaymentAccount, EXTRA_CHARGE_ITEM_TYPES } from '@/config/constants';
+import type { BookingCharge, BookingPayment, ExtraChargeItemType, PaymentAccount, PaymentMode } from '@/types';
 import dayjs from 'dayjs';
 
 export default function BookingDetailPage() {
@@ -59,13 +77,16 @@ export default function BookingDetailPage() {
   const [payAmount, setPayAmount] = useState('');
   const [payMode, setPayMode] = useState<PaymentMode>('Cash');
   const [payAccount, setPayAccount] = useState<PaymentAccount>('None');
-  const [chargeLabel, setChargeLabel] = useState('');
-  const [chargeAmount, setChargeAmount] = useState('');
+  const [chargeItemType, setChargeItemType] = useState<ExtraChargeItemType>('Water Bottle');
+  const [chargeCustomName, setChargeCustomName] = useState('');
+  const [chargeQuantity, setChargeQuantity] = useState('1');
+  const [chargeUnitPrice, setChargeUnitPrice] = useState('');
   const [chargeMode, setChargeMode] = useState<PaymentMode>('Cash');
   const [chargeAccount, setChargeAccount] = useState<PaymentAccount>('None');
   const [chargePaidAtOrder, setChargePaidAtOrder] = useState(false);
   const [collectModes, setCollectModes] = useState<Record<string, PaymentMode>>({});
   const [collectAccounts, setCollectAccounts] = useState<Record<string, PaymentAccount>>({});
+  const [chargeEdits, setChargeEdits] = useState<Record<string, { quantity: string; unitPrice: string }>>({});
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   const booking = useMemo(() => bookings.find((b) => b.id === id), [bookings, id]);
@@ -152,41 +173,55 @@ export default function BookingDetailPage() {
   };
 
   const addExtraCharge = async () => {
-    const label = chargeLabel.trim();
-    const amount = Number(chargeAmount);
-    if (!label) return toast.error('Enter what was ordered (e.g. Water bottle)');
-    if (!amount || amount <= 0) return toast.error('Enter a valid amount');
+    const quantity = Number(chargeQuantity);
+    const unitPrice = Number(chargeUnitPrice);
+    const customName = chargeCustomName.trim();
+    if (chargeItemType === 'Other' && !customName) {
+      return toast.error('Enter a name for Other');
+    }
+    if (!quantity || quantity <= 0) return toast.error('Enter a valid quantity');
+    if (!unitPrice || unitPrice <= 0) return toast.error('Enter a valid price');
 
-    const chargeId = `xc-${Date.now()}`;
-    const next: BookingCharge[] = [
-      ...extraCharges,
-      { id: chargeId, label, amount, paymentMode: chargeMode, account: chargeAccount, paidAtOrder: chargePaidAtOrder },
-    ];
+    const charge = buildExtraCharge({
+      itemType: chargeItemType,
+      customName,
+      quantity,
+      unitPrice,
+      paymentMode: chargeMode,
+      account: chargeAccount,
+      paidAtOrder: chargePaidAtOrder,
+    });
+    const chargeId = charge.id;
+    const next: BookingCharge[] = [...extraCharges, charge];
     const nextPayments: BookingPayment[] = [...payments];
     if (chargePaidAtOrder) {
       nextPayments.push({
         id: `pay-${chargeId}`,
-        amount,
+        amount: charge.amount,
         mode: chargeMode,
         account: chargeAccount,
         date: dayjs().format('YYYY-MM-DD'),
-        note: label,
+        note: charge.label,
       });
     }
     await persistBill(next, nextPayments);
-    setChargeLabel('');
-    setChargeAmount('');
+    setChargeItemType('Water Bottle');
+    setChargeCustomName('');
+    setChargeQuantity('1');
+    setChargeUnitPrice('');
     setChargeMode('Cash');
     setChargeAccount('None');
     setChargePaidAtOrder(false);
     toast.success(
-      chargePaidAtOrder ? `${label} added · paid ${chargeMode}` : `${label} added · pending`,
+      chargePaidAtOrder
+        ? `${charge.label} added · paid ${chargeMode}`
+        : `${charge.label} added · pending`,
     );
   };
 
   const removeExtraCharge = async (charge: BookingCharge) => {
     const ok = await confirm({
-      title: `Remove “${charge.label}”?`,
+      title: `Remove “${formatExtraChargeLabel(charge)}”?`,
       description: `${formatINR(charge.amount)} (${charge.paymentMode ?? 'Cash'}) will be removed from this bill.`,
       confirmText: 'Delete',
       destructive: true,
@@ -207,7 +242,82 @@ export default function BookingDetailPage() {
       [charge.id]: account,
     });
     await persistBill(nextExtras, nextPayments);
-    toast.success(`${charge.label} · ${formatINR(charge.amount)} collected (${mode})`);
+    toast.success(`${formatExtraChargeLabel(charge)} · ${formatINR(charge.amount)} collected (${mode})`);
+  };
+
+  const getChargeEdit = (charge: BookingCharge) =>
+    chargeEdits[charge.id] ?? {
+      quantity: String(charge.quantity ?? 1),
+      unitPrice: String(charge.unitPrice ?? charge.amount),
+    };
+
+  const setChargeEdit = (
+    charge: BookingCharge,
+    field: 'quantity' | 'unitPrice',
+    value: string,
+  ) => {
+    setChargeEdits((prev) => ({
+      ...prev,
+      [charge.id]: {
+        ...(prev[charge.id] ?? {
+          quantity: String(charge.quantity ?? 1),
+          unitPrice: String(charge.unitPrice ?? charge.amount),
+        }),
+        [field]: value,
+      },
+    }));
+  };
+
+  const isChargeEditDirty = (charge: BookingCharge) => {
+    const draft = chargeEdits[charge.id];
+    if (!draft) return false;
+    return (
+      draft.quantity !== String(charge.quantity ?? 1) ||
+      draft.unitPrice !== String(charge.unitPrice ?? charge.amount)
+    );
+  };
+
+  const cancelExtraChargeEdit = (chargeId: string) => {
+    setChargeEdits((prev) => {
+      const next = { ...prev };
+      delete next[chargeId];
+      return next;
+    });
+  };
+
+  const saveExtraChargeEdit = async (charge: BookingCharge) => {
+    const draft = chargeEdits[charge.id] ?? getChargeEdit(charge);
+    const quantity = Number(draft.quantity);
+    const unitPrice = Number(draft.unitPrice);
+    if (!quantity || quantity <= 0) return toast.error('Enter a valid quantity');
+    if (!unitPrice || unitPrice <= 0) return toast.error('Enter a valid price');
+
+    const updated = recalculateExtraCharge(charge, quantity, unitPrice);
+    const unchanged =
+      updated.amount === charge.amount &&
+      (updated.quantity ?? 1) === (charge.quantity ?? 1) &&
+      (updated.unitPrice ?? charge.amount) === (charge.unitPrice ?? charge.amount);
+    if (unchanged) {
+      setChargeEdits((prev) => {
+        const next = { ...prev };
+        delete next[charge.id];
+        return next;
+      });
+      return;
+    }
+
+    const nextExtras = extraCharges.map((c) => (c.id === charge.id ? updated : c));
+    const payId = `pay-${charge.id}`;
+    const nextPayments = payments.map((p) =>
+      p.id === payId ? { ...p, amount: updated.amount, note: updated.label } : p,
+    );
+    await persistBill(nextExtras, nextPayments);
+    setChargeEdits((prev) => {
+      const next = { ...prev };
+      delete next[charge.id];
+      return next;
+    });
+    toast.success('Charge updated');
   };
 
   const recordPayment = async () => {
@@ -287,37 +397,94 @@ export default function BookingDetailPage() {
         title={`Booking ${booking.code}`}
         description={`${booking.guestName} · Room ${booking.roomNumber}`}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="gap-1.5">
-              <ArrowLeft className="h-4 w-4" /> Back
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
-              <Pencil className="h-4 w-4" /> Edit
-            </Button>
-            {booking.status === 'Reserved' && (
-              <Button size="sm" onClick={checkIn} className="gap-1.5">
-                <LogIn className="h-4 w-4" /> Check In
+          <>
+            <div className="flex w-full items-center gap-2 sm:hidden">
+              <Button variant="outline" size="icon" onClick={() => navigate(-1)} aria-label="Back">
+                <ArrowLeft className="h-4 w-4" />
               </Button>
-            )}
-            {(booking.status === 'Checked In' || booking.status === 'Reserved') && (
-              <Button size="sm" onClick={checkOut} className="gap-1.5">
-                <LogOut className="h-4 w-4" /> Check Out
+              {booking.status === 'Reserved' && (
+                <Button size="sm" className="flex-1 gap-1.5" onClick={checkIn}>
+                  <LogIn className="h-4 w-4" /> Check In
+                </Button>
+              )}
+              {(booking.status === 'Checked In' || booking.status === 'Reserved') && (
+                <Button size="sm" className="flex-1 gap-1.5" onClick={checkOut}>
+                  <LogOut className="h-4 w-4" /> Check Out
+                </Button>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" aria-label="More actions">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                    <Pencil className="h-4 w-4" /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setInvoiceOpen(true)}>
+                    <FileText className="h-4 w-4" /> Invoice
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handlePrint}>
+                    <Printer className="h-4 w-4" /> Print
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <div className="hidden flex-wrap gap-2 sm:flex">
+              <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="gap-1.5">
+                <ArrowLeft className="h-4 w-4" /> Back
               </Button>
-            )}
-          </div>
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
+                <Pencil className="h-4 w-4" /> Edit
+              </Button>
+              {booking.status === 'Reserved' && (
+                <Button size="sm" onClick={checkIn} className="gap-1.5">
+                  <LogIn className="h-4 w-4" /> Check In
+                </Button>
+              )}
+              {(booking.status === 'Checked In' || booking.status === 'Reserved') && (
+                <Button size="sm" onClick={checkOut} className="gap-1.5">
+                  <LogOut className="h-4 w-4" /> Check Out
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setInvoiceOpen(true)}
+              >
+                <FileText className="h-4 w-4" /> Invoice
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={handlePrint}>
+                <Printer className="h-4 w-4" /> Print
+              </Button>
+            </div>
+          </>
         }
       />
 
+      <div className="flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2.5 lg:hidden">
+        <div className="flex flex-wrap gap-1.5">
+          <BookingStatusBadge status={booking.status} />
+          <PaymentStatusBadge status={status} pending={balance} />
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Due</p>
+          <Money value={balance} className="text-base font-semibold" colored={balance > 0} muteZero={false} />
+        </div>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex-row items-center justify-between">
+        <Card className="order-2 lg:order-none lg:col-span-2">
+          <CardHeader className="flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base">Booking Details</CardTitle>
-            <div className="flex gap-2">
+            <div className="hidden gap-2 sm:flex">
               <BookingStatusBadge status={booking.status} />
               <PaymentStatusBadge status={status} />
             </div>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
+          <CardContent className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
             <Detail label="Guest" value={booking.guestName} />
             <Detail
               label="Mobile"
@@ -332,8 +499,8 @@ export default function BookingDetailPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
+        <Card className="order-1 lg:order-none">
+          <CardHeader className="pb-3">
             <CardTitle className="text-base">Bill Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
@@ -370,7 +537,7 @@ export default function BookingDetailPage() {
                   return (
                     <Row
                       key={c.id}
-                      label={`${c.label}${paid ? ` (${c.paymentMode})` : ''} · ${paid ? 'Paid' : 'Pending'}`}
+                      label={`${formatExtraChargeLabel(c)}${paid ? ` (${c.paymentMode})` : ''} · ${paid ? 'Paid' : 'Pending'}`}
                       value={c.amount}
                       danger={!paid}
                     />
@@ -399,77 +566,119 @@ export default function BookingDetailPage() {
           <CardTitle className="text-base">Extra Charges</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+              <Label className="text-xs">Item</Label>
+              <Select
+                value={chargeItemType}
+                onValueChange={(v) => setChargeItemType(v as ExtraChargeItemType)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EXTRA_CHARGE_ITEM_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {chargeItemType === 'Other' && (
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+                <Label className="text-xs">Name</Label>
+                <Input
+                  value={chargeCustomName}
+                  onChange={(e) => setChargeCustomName(e.target.value)}
+                  placeholder="Item name"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addExtraCharge();
+                    }
+                  }}
+                />
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Quantity</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={chargeQuantity}
+                  onChange={(e) => setChargeQuantity(e.target.value)}
+                  placeholder="1"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addExtraCharge();
+                    }
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Price (₹)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={chargeUnitPrice}
+                  onChange={(e) => setChargeUnitPrice(e.target.value)}
+                  placeholder="0"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addExtraCharge();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <div className="col-span-full grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Payment Mode</Label>
+                <Select
+                  value={chargeMode}
+                  onValueChange={(v) => {
+                    const mode = v as PaymentMode;
+                    setChargeMode(mode);
+                    if (mode === 'Cash') setChargeAccount('None');
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_MODES.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Account</Label>
+                <Select
+                  value={chargeAccount}
+                  onValueChange={(v) => setChargeAccount(v as PaymentAccount)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_ACCOUNTS.map((a) => (
+                      <SelectItem key={a} value={a}>
+                        {formatPaymentAccount(a)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <Label className="text-xs">Item / Request</Label>
-              <Input
-                value={chargeLabel}
-                onChange={(e) => setChargeLabel(e.target.value)}
-                placeholder="Water bottle, laundry, snacks…"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addExtraCharge();
-                  }
-                }}
-              />
-            </div>
-            <div className="w-full space-y-1.5 sm:w-32">
-              <Label className="text-xs">Amount (₹)</Label>
-              <Input
-                type="number"
-                min={0}
-                value={chargeAmount}
-                onChange={(e) => setChargeAmount(e.target.value)}
-                placeholder="0"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addExtraCharge();
-                  }
-                }}
-              />
-            </div>
-            <div className="w-full space-y-1.5 sm:w-36">
-              <Label className="text-xs">Payment Mode</Label>
-              <Select
-                value={chargeMode}
-                onValueChange={(v) => {
-                  const mode = v as PaymentMode;
-                  setChargeMode(mode);
-                  if (mode === 'Cash') setChargeAccount('None');
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_MODES.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-full space-y-1.5 sm:w-36">
-              <Label className="text-xs">Account</Label>
-              <Select
-                value={chargeAccount}
-                onValueChange={(v) => setChargeAccount(v as PaymentAccount)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_ACCOUNTS.map((a) => (
-                    <SelectItem key={a} value={a}>
-                      {PAYMENT_ACCOUNT_LABELS[a]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
             <Button onClick={addExtraCharge} className="w-full gap-1.5 sm:w-auto">
               <Plus className="h-4 w-4" /> Add to Bill
             </Button>
@@ -495,16 +704,91 @@ export default function BookingDetailPage() {
               {extraCharges.map((c) => {
                 const paid = isExtraChargePaid(c, payments);
                 const collectMode = collectModes[c.id] ?? c.paymentMode;
+                const edit = getChargeEdit(c);
+                const editQty = Number(edit.quantity) || 0;
+                const editPrice = Number(edit.unitPrice) || 0;
+                const editTotal = editQty > 0 && editPrice > 0 ? round2(editQty * editPrice) : c.amount;
+                const dirty = isChargeEditDirty(c);
                 return (
-                  <div key={c.id} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{c.label}</p>
+                  <div key={c.id} className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-2.5">
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <div className="flex items-start justify-between gap-2 sm:block">
+                        <p className="truncate font-medium">{extraChargeName(c)}</p>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="-mr-1 h-8 w-8 shrink-0 text-destructive sm:hidden"
+                          onClick={() => removeExtraCharge(c)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-end">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Qty</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            className="h-8 w-16 text-xs"
+                            value={edit.quantity}
+                            onChange={(e) => setChargeEdit(c, 'quantity', e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && dirty) {
+                                e.preventDefault();
+                                saveExtraChargeEdit(c);
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Price (₹)</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            className="h-8 w-20 text-xs"
+                            value={edit.unitPrice}
+                            onChange={(e) => setChargeEdit(c, 'unitPrice', e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && dirty) {
+                                e.preventDefault();
+                                saveExtraChargeEdit(c);
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Total</Label>
+                          <p className="flex h-8 items-center text-sm font-medium">
+                            <Money value={editTotal} muteZero={false} />
+                          </p>
+                        </div>
+                        {dirty && (
+                          <div className="col-span-3 flex items-end gap-1.5 sm:col-span-1">
+                            <Button
+                              size="sm"
+                              className="h-8 flex-1 sm:flex-none"
+                              onClick={() => saveExtraChargeEdit(c)}
+                              disabled={update.isPending}
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 flex-1 sm:flex-none"
+                              onClick={() => cancelExtraChargeEdit(c.id)}
+                              disabled={update.isPending}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
-                        <Money value={c.amount} muteZero={false} />
-                        {paid ? ` · Paid · ${c.paymentMode}${c.account && c.account !== 'None' ? ` · ${PAYMENT_ACCOUNT_LABELS[c.account]}` : ''}` : ' · Pending'}
+                        {paid ? `Paid · ${c.paymentMode} · ${formatPaymentAccount(c.account)}` : 'Pending'}
                       </p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:items-center sm:gap-1.5">
                       {!paid && (
                         <>
                           <Select
@@ -513,7 +797,7 @@ export default function BookingDetailPage() {
                               setCollectModes((prev) => ({ ...prev, [c.id]: v as PaymentMode }))
                             }
                           >
-                            <SelectTrigger className="h-8 w-[calc(50%-0.1875rem)] text-xs sm:w-[100px]">
+                            <SelectTrigger className="h-9 w-full text-xs sm:h-8 sm:w-[100px]">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -530,13 +814,13 @@ export default function BookingDetailPage() {
                               setCollectAccounts((prev) => ({ ...prev, [c.id]: v as PaymentAccount }))
                             }
                           >
-                            <SelectTrigger className="h-8 w-[calc(50%-0.1875rem)] text-xs sm:w-[110px]">
+                            <SelectTrigger className="h-9 w-full text-xs sm:h-8 sm:w-[110px]">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                               {PAYMENT_ACCOUNTS.map((a) => (
                                 <SelectItem key={a} value={a}>
-                                  {PAYMENT_ACCOUNT_LABELS[a]}
+                                  {formatPaymentAccount(a)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -544,17 +828,17 @@ export default function BookingDetailPage() {
                           <Button
                             size="sm"
                             variant="secondary"
-                            className="h-8 flex-1 sm:flex-none"
+                            className="col-span-2 h-9 sm:col-span-1 sm:h-8 sm:w-auto"
                             onClick={() => collectExtraCharge(c)}
                           >
-                            Collect
+                            Collect {formatINR(c.amount)}
                           </Button>
                         </>
                       )}
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="h-8 w-8 shrink-0 text-destructive"
+                        className="hidden h-8 w-8 shrink-0 text-destructive sm:inline-flex"
                         onClick={() => removeExtraCharge(c)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -568,63 +852,69 @@ export default function BookingDetailPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Record Payment</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Record Payment</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
             <p className="text-xs text-muted-foreground">
               Room rent collections only — pending extras are collected separately.
             </p>
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="min-w-[120px] flex-1">
+            <div className="space-y-3 lg:flex lg:flex-wrap lg:items-end lg:gap-3 lg:space-y-0">
+              <div className="lg:min-w-[120px] lg:flex-1">
                 <Label className="mb-1.5 block text-xs">Amount</Label>
                 <Input
                   type="number"
+                  inputMode="decimal"
                   value={payAmount}
                   onChange={(e) => setPayAmount(e.target.value)}
                   placeholder="₹"
                 />
               </div>
-              <div className="w-36">
-                <Label className="mb-1.5 block text-xs">Mode</Label>
-                <Select
-                  value={payMode}
-                  onValueChange={(v) => {
-                    const mode = v as PaymentMode;
-                    setPayMode(mode);
-                    if (mode === 'Cash') setPayAccount('None');
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_MODES.map((m) => (
-                      <SelectItem key={m} value={m}>
-                        {m}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-3 lg:contents">
+                <div className="min-w-0 lg:w-36">
+                  <Label className="mb-1.5 block text-xs">Mode</Label>
+                  <Select
+                    value={payMode}
+                    onValueChange={(v) => {
+                      const mode = v as PaymentMode;
+                      setPayMode(mode);
+                      if (mode === 'Cash') setPayAccount('None');
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_MODES.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="min-w-0 lg:w-36">
+                  <Label className="mb-1.5 block text-xs">Account</Label>
+                  <Select value={payAccount} onValueChange={(v) => setPayAccount(v as PaymentAccount)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_ACCOUNTS.map((a) => (
+                        <SelectItem key={a} value={a}>
+                          {formatPaymentAccount(a)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="w-36">
-                <Label className="mb-1.5 block text-xs">Account</Label>
-                <Select value={payAccount} onValueChange={(v) => setPayAccount(v as PaymentAccount)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_ACCOUNTS.map((a) => (
-                      <SelectItem key={a} value={a}>
-                        {a} Account
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={recordPayment} disabled={balance <= 0}>
+              <Button
+                className="w-full lg:w-auto"
+                onClick={recordPayment}
+                disabled={balance <= 0}
+              >
                 {balance <= 0 ? 'Fully Paid' : 'Add Payment'}
               </Button>
             </div>
@@ -637,8 +927,7 @@ export default function BookingDetailPage() {
                   <div key={p.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
                     <div className="min-w-0">
                       <p className="font-medium">
-                        <Money value={p.amount} muteZero={false} /> · {p.mode}
-                        {p.account && p.account !== 'None' ? ` · ${PAYMENT_ACCOUNT_LABELS[p.account]}` : ''}
+                        <Money value={p.amount} muteZero={false} /> · {p.mode} · {formatPaymentAccount(p.account)}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {formatDate(p.date)}
@@ -658,22 +947,7 @@ export default function BookingDetailPage() {
               </div>
             )}
           </CardContent>
-        </Card>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => setInvoiceOpen(true)}
-          >
-            <FileText className="h-4 w-4" /> View Invoice
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={handlePrint}>
-            <Printer className="h-4 w-4" /> Print
-          </Button>
-        </div>
-      </div>
+      </Card>
 
       <BookingCheckoutDialog
         booking={booking}
@@ -704,9 +978,9 @@ export default function BookingDetailPage() {
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-medium">{value}</p>
+      <p className="truncate font-medium">{value}</p>
     </div>
   );
 }

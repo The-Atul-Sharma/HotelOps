@@ -40,7 +40,7 @@ import { usePagination } from "@/hooks/usePagination";
 import { useDateRange } from "@/hooks/useDateRange";
 import { DateRangeFilter } from "@/components/shared/DateRangeFilter";
 import { PaginationBar } from "@/components/shared/Pagination";
-import { EXPENSE_CATEGORIES, PAYMENT_ACCOUNTS, PAYMENT_ACCOUNT_LABELS, PAYMENT_MODES } from "@/config/constants";
+import { EXPENSE_CATEGORIES, PAYMENT_ACCOUNTS, PAYMENT_MODES, formatPaymentAccount } from "@/config/constants";
 import { exportToExcel } from "@/utils/excel";
 import { formatDate, formatINR } from "@/utils/format";
 import { inRange } from "@/utils/dateRange";
@@ -342,7 +342,7 @@ export default function ExpensesPage() {
                       {e.category === "STF" ? e.description : "—"}
                     </TableCell>
                     <TableCell>{e.paymentMode}</TableCell>
-                    <TableCell>{e.account === "None" || !e.account ? "—" : e.account}</TableCell>
+                    <TableCell>{formatPaymentAccount(e.account)}</TableCell>
                     <TableCell className="max-w-[160px] truncate text-muted-foreground">
                       {e.remarks || "—"}
                     </TableCell>
@@ -432,10 +432,10 @@ export default function ExpensesPage() {
                 className="disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-100"
               />
             </F>
+            <F label="Amount (₹)" error={errors.amount?.message}>
+              <Input type="number" inputMode="decimal" {...register("amount")} />
+            </F>
             <div className="grid grid-cols-2 gap-4">
-              <F label="Amount (₹)" error={errors.amount?.message}>
-                <Input type="number" {...register("amount")} />
-              </F>
               <F label="Payment Mode">
                 <Select
                   value={watch("paymentMode")}
@@ -457,24 +457,24 @@ export default function ExpensesPage() {
                   </SelectContent>
                 </Select>
               </F>
+              <F label="Account">
+                <Select
+                  value={watch("account")}
+                  onValueChange={(v) => setValue("account", v as PaymentAccount)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_ACCOUNTS.map((a) => (
+                      <SelectItem key={a} value={a}>
+                        {formatPaymentAccount(a)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </F>
             </div>
-            <F label="Account">
-              <Select
-                value={watch("account")}
-                onValueChange={(v) => setValue("account", v as PaymentAccount)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_ACCOUNTS.map((a) => (
-                    <SelectItem key={a} value={a}>
-                      {PAYMENT_ACCOUNT_LABELS[a]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </F>
             <F label="Remark">
               <Input {...register("remarks")} placeholder="Optional" />
             </F>

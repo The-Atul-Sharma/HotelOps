@@ -26,7 +26,7 @@ import {
 import { useBookings } from "@/hooks/useEntities";
 import { usePagination } from "@/hooks/usePagination";
 import { useDateRange } from "@/hooks/useDateRange";
-import { PAYMENT_MODES } from "@/config/constants";
+import { PAYMENT_MODES, formatPaymentAccount } from "@/config/constants";
 import { round2 } from "@/utils/finance";
 import { formatDate } from "@/utils/format";
 import { inRange } from "@/utils/dateRange";
@@ -172,7 +172,7 @@ export default function PaymentsPage() {
                     <TableCell className="font-medium">{b.guestName}</TableCell>
                     <TableCell className="text-center">{b.roomNumber}</TableCell>
                     <TableCell>{p.mode}</TableCell>
-                    <TableCell>{!p.account || p.account === "None" ? "—" : p.account}</TableCell>
+                    <TableCell>{formatPaymentAccount(p.account)}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {p.note || "—"}
                     </TableCell>

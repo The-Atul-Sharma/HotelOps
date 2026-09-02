@@ -1,4 +1,5 @@
 import type {
+  ExtraChargeItemType,
   PaymentAccount,
   PaymentMode,
   PaymentStatus,
@@ -9,6 +10,15 @@ import type {
   AdvanceStatus,
   UserRole,
 } from '@/types';
+
+export const EXTRA_CHARGE_ITEM_TYPES: ExtraChargeItemType[] = [
+  'Water Bottle',
+  'Ice Qube',
+  'Peanut Masala',
+  'Tea',
+  'Food',
+  'Other',
+];
 
 export const PAYMENT_MODES: PaymentMode[] = [
   'Cash',
@@ -26,6 +36,10 @@ export const PAYMENT_ACCOUNT_LABELS: Record<PaymentAccount, string> = {
   Hotel: 'Hotel Account',
   Hulla: 'Hulla Account',
 };
+
+export function formatPaymentAccount(account?: PaymentAccount | null): string {
+  return PAYMENT_ACCOUNT_LABELS[account ?? 'None'];
+}
 
 export const PAYMENT_STATUSES: PaymentStatus[] = ['PAID', 'PARTIAL', 'PENDING', 'OVERDUE'];
 

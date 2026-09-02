@@ -64,10 +64,22 @@ export type BookingStatus =
   | 'Cancelled'
   | 'No Show';
 
+export type ExtraChargeItemType =
+  | 'Water Bottle'
+  | 'Ice Qube'
+  | 'Peanut Masala'
+  | 'Tea'
+  | 'Food'
+  | 'Other';
+
 export interface BookingCharge {
   id: ID;
   label: string;
   amount: number;
+  itemType?: ExtraChargeItemType;
+  quantity?: number;
+  unitPrice?: number;
+  customName?: string;
   paymentMode: PaymentMode;
   account?: PaymentAccount;
   paidAtOrder?: boolean;

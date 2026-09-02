@@ -514,20 +514,10 @@ function buildReport(
           Date: formatDate(b.checkInDate),
           Guest: b.guestName,
           Room: b.roomNumber,
-          "Room Service": b.roomService || 0,
-          Food: b.foodAmount || 0,
-          Other: round2(
-            (b.extraCharges?.length
-              ? (b.extraCharges || []).reduce((s, c) => s + c.amount, 0)
-              : b.otherCharges) || 0,
-          ),
-          Total: bookingExtrasIncome(b),
+          "Extra Charges": bookingExtrasIncome(b),
         }));
       const extrasTotal = round2(
         active.reduce((s, b) => s + bookingExtrasIncome(b), 0),
-      );
-      const roomServiceTotal = round2(
-        active.reduce((s, b) => s + (b.roomService || 0), 0),
       );
       return {
         rows,
@@ -536,24 +526,17 @@ function buildReport(
           { key: "Guest", label: "Guest" },
           { key: "Room", label: "Room" },
           {
-            key: "Room Service",
-            label: "Room Service",
+            key: "Extra Charges",
+            label: "Extra Charges",
             align: "right",
             money: true,
           },
-          { key: "Food", label: "Food", align: "right", money: true },
-          { key: "Other", label: "Other", align: "right", money: true },
-          { key: "Total", label: "Total", align: "right", money: true },
         ],
         summary: [
           {
             label: "Extra Charges",
             value: extrasTotal,
             tone: "text-success",
-          },
-          {
-            label: "Room Service",
-            value: roomServiceTotal,
           },
         ],
       };

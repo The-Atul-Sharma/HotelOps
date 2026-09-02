@@ -2,17 +2,19 @@ import { forwardRef } from 'react';
 import type { Booking, HotelSettings } from '@/types';
 import { formatINR, formatDate, formatRoomTariffLabel } from '@/utils/format';
 import { bookingRoomTotal, computeBookingBill, round2 } from '@/utils/finance';
+import { formatExtraChargeLabel } from './bookingUtils';
 
 export const Invoice = forwardRef<HTMLDivElement, { booking: Booking; settings: HotelSettings }>(
   function Invoice({ booking, settings }, ref) {
     const roomTotal = bookingRoomTotal(booking);
+    const extraCharges = booking.extraCharges ?? [];
     const taxPercent =
       booking.taxPercent > 0 ? booking.taxPercent : settings.taxPercent || 0;
     const bill = computeBookingBill({
       roomAmount: roomTotal,
-      extraCharges: [],
-      foodAmount: 0,
-      roomService: 0,
+      extraCharges,
+      foodAmount: booking.foodAmount,
+      roomService: booking.roomService,
       discount: booking.discount,
       taxPercent,
       paidAmount: booking.paidAmount,
@@ -81,6 +83,29 @@ export const Invoice = forwardRef<HTMLDivElement, { booking: Booking; settings: 
                 </tr>
               </>
             )}
+            {booking.foodAmount > 0 && (
+              <tr className="border-b border-gray-300">
+                <td className="py-1.5">Food</td>
+                <td className="py-1.5 text-right">{formatINR(booking.foodAmount)}</td>
+              </tr>
+            )}
+            {booking.roomService > 0 && (
+              <tr className="border-b border-gray-300">
+                <td className="py-1.5">Room Service</td>
+                <td className="py-1.5 text-right">{formatINR(booking.roomService)}</td>
+              </tr>
+            )}
+            {extraCharges.map((c) => (
+              <tr key={c.id} className="border-b border-gray-300">
+                <td className="py-1.5">
+                  {formatExtraChargeLabel(c)}
+                  {(c.quantity ?? 1) > 1 && c.unitPrice != null && (
+                    <span className="text-gray-600"> @ {formatINR(c.unitPrice)}</span>
+                  )}
+                </td>
+                <td className="py-1.5 text-right">{formatINR(c.amount)}</td>
+              </tr>
+            ))}
           </tbody>
           <tfoot>
             <tr className="border-y-2 border-black font-bold">
@@ -90,10 +115,16 @@ export const Invoice = forwardRef<HTMLDivElement, { booking: Booking; settings: 
           </tfoot>
         </table>
 
-        {taxPercent > 0 && (
+        {(taxPercent > 0 || extraCharges.length > 0) && (
           <p className="mt-3 text-xs text-gray-600">
-            GST @ {taxPercent}% included in room tariff · Taxable {formatINR(taxable)} · Tax{' '}
-            {formatINR(taxAmount)}
+            {taxPercent > 0 && (
+              <>
+                GST @ {taxPercent}% included in room tariff · Taxable {formatINR(taxable)} · Tax{' '}
+                {formatINR(taxAmount)}
+              </>
+            )}
+            {taxPercent > 0 && extraCharges.length > 0 && ' · '}
+            {extraCharges.length > 0 && 'Extra charges are not subject to GST'}
           </p>
         )}
 
