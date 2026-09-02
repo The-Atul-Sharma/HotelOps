@@ -120,3 +120,7 @@ export const BOOKING_STATUS_COLORS: Record<BookingStatus, string> = {
 };
 
 export const STORAGE_PREFIX = 'hotelflow';
+
+export const ACCOUNT_BALANCE_FROM = '2026-09-01';
+
+export const ACCOUNT_BALANCE_MESSAGE = 'From September 2026 onwards';

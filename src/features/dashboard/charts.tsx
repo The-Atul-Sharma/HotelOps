@@ -189,6 +189,30 @@ export function MonthlyProfitChart({ data }: { data: MonthlyProfitPoint[] }) {
   );
 }
 
+export function AccountBalanceChart({ data }: { data: { name: string; value: number }[] }) {
+  if (data.length === 0) {
+    return (
+      <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">
+        No balance data yet.
+      </div>
+    );
+  }
+  return (
+    <ResponsiveContainer width="100%" height={260}>
+      <BarChart data={data} margin={{ left: -12, right: 8, top: 8 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+        <XAxis dataKey="name" {...axisProps} />
+        <YAxis {...axisProps} tickFormatter={compact} width={56} />
+        <Tooltip {...tooltipStyle} cursor={{ fill: 'var(--accent)' }} formatter={moneyFormatter} />
+        <Bar dataKey="value" name="Balance" radius={[6, 6, 0, 0]}>
+          {data.map((_, i) => (
+            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
 export function PendingPaymentsChart({ data }: { data: { name: string; paid: number; pending: number }[] }) {
   return (
     <ResponsiveContainer width="100%" height={260}>

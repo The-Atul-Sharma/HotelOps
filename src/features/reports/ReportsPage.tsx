@@ -26,6 +26,7 @@ import {
   bookingRoomIncome,
   bookingTotalIncome,
   calculatePaymentStatus,
+  computeAccountBalances,
   isActiveBooking,
   paymentCollectionBucket,
   resolveBookingPayments,
@@ -33,6 +34,8 @@ import {
 } from "@/utils/finance";
 import { exportToExcel } from "@/utils/excel";
 import { formatDate } from "@/utils/format";
+import { ACCOUNT_BALANCE_FROM, ACCOUNT_BALANCE_MESSAGE } from "@/config/constants";
+import { AccountBalanceChart } from "@/features/dashboard/charts";
 import type { Booking, BookingPayment, DateRange, Expense } from "@/types";
 
 const REPORTS = [
@@ -42,6 +45,7 @@ const REPORTS = [
   "Pending Payments",
   "Room Revenue",
   "Extra Charges",
+  "Account Balance",
   "STF",
 ] as const;
 type ReportType = (typeof REPORTS)[number];
@@ -89,7 +93,7 @@ export default function ReportsPage() {
     [bookings, range],
   );
 
-  const { rows, columns, summary } = useMemo(
+  const { rows, columns, summary, chartData, subtitle } = useMemo(
     () =>
       buildReport(
         report,
@@ -97,9 +101,10 @@ export default function ReportsPage() {
         incomeBookings,
         bookings,
         scopedExpenses,
+        expenses,
         range,
       ),
-    [report, paymentRows, incomeBookings, bookings, scopedExpenses, range],
+    [report, paymentRows, incomeBookings, bookings, scopedExpenses, expenses, range],
   );
 
   const { page, setPage, pageItems, total: pageTotal } = usePagination(
@@ -116,7 +121,7 @@ export default function ReportsPage() {
         description="Financial and operational reports with export."
         actions={
           <div className="flex flex-wrap gap-2">
-            <DateRangeFilter {...filterProps} />
+            {report !== "Account Balance" && <DateRangeFilter {...filterProps} />}
             <Button
               variant="outline"
               size="sm"
@@ -149,8 +154,16 @@ export default function ReportsPage() {
         ))}
       </div>
 
+      {report === "Account Balance" && (
+        <p className="rounded-lg border bg-muted/50 px-4 py-2.5 text-sm text-muted-foreground">
+          {ACCOUNT_BALANCE_MESSAGE} · money received minus expenses per account
+        </p>
+      )}
+
       {summary.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div
+          className={`grid gap-3 ${report === "Account Balance" ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}
+        >
           {summary.map((s) => (
             <Card key={s.label} className="p-4">
               <p className="text-xs text-muted-foreground">{s.label}</p>
@@ -165,8 +178,14 @@ export default function ReportsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{report}</CardTitle>
+          {subtitle && (
+            <p className="text-xs text-muted-foreground">{subtitle}</p>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
+          {chartData && chartData.length > 0 && (
+            <AccountBalanceChart data={chartData} />
+          )}
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -255,11 +274,14 @@ function buildReport(
   incomeBookings: Booking[],
   bookings: Booking[],
   expenses: Expense[],
+  allExpenses: Expense[],
   range: DateRange,
 ): {
   rows: Record<string, unknown>[];
   columns: Column[];
   summary: { label: string; value: number; tone?: string }[];
+  chartData?: { name: string; value: number }[];
+  subtitle?: string;
 } {
   const totals = collectionTotals(paymentRows);
   const totalRevenue = round2(
@@ -539,6 +561,40 @@ function buildReport(
             tone: "text-success",
           },
         ],
+      };
+    }
+    case "Account Balance": {
+      const abRange: DateRange = { from: ACCOUNT_BALANCE_FROM, to: range.to };
+      const payments: BookingPayment[] = [];
+      for (const b of bookings) {
+        if (!isActiveBooking(b)) continue;
+        for (const payment of resolveBookingPayments(b)) {
+          if (inRange(payment.date, abRange)) payments.push(payment);
+        }
+      }
+      const abExpenses = allExpenses.filter((e) => inRange(e.date, abRange));
+      const balances = computeAccountBalances(payments, abExpenses);
+      const rows = balances.map((b) => ({
+        Account: b.label,
+        Received: b.income,
+        Expenses: b.expense,
+        Balance: b.balance,
+      }));
+      return {
+        rows,
+        columns: [
+          { key: "Account", label: "Account" },
+          { key: "Received", label: "Received", align: "right", money: true },
+          { key: "Expenses", label: "Expenses", align: "right", money: true },
+          { key: "Balance", label: "Balance", align: "right", money: true },
+        ],
+        summary: balances.map((b) => ({
+          label: b.label,
+          value: b.balance,
+          tone: b.balance >= 0 ? "text-success" : "text-destructive",
+        })),
+        chartData: balances.map((b) => ({ name: b.label, value: b.balance })),
+        subtitle: `${ACCOUNT_BALANCE_MESSAGE} · money received minus expenses per account`,
       };
     }
     case "STF": {

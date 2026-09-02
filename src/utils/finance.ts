@@ -6,6 +6,7 @@ import type {
   Expense,
   Advance,
   BookingPayment,
+  PaymentAccount,
 } from '@/types';
 
 export function round2(n: number): number {
@@ -428,4 +429,69 @@ export function totalExpenses(expenses: Expense[]): number {
 
 export function totalAdvanceRemaining(advances: Advance[]): number {
   return round2(advances.reduce((s, a) => s + a.remainingAmount, 0));
+}
+
+export type AccountBalanceBucket = 'Cash' | 'Hotel' | 'Hulla';
+
+export const ACCOUNT_BALANCE_BUCKETS: AccountBalanceBucket[] = ['Cash', 'Hotel', 'Hulla'];
+
+export const ACCOUNT_BALANCE_LABELS: Record<AccountBalanceBucket, string> = {
+  Cash: 'Cash',
+  Hotel: 'Hotel Account',
+  Hulla: 'Hulla Account',
+};
+
+export function paymentAccountBucket(payment: {
+  mode: string;
+  account?: PaymentAccount | null;
+}): AccountBalanceBucket {
+  if (payment.account === 'Hotel') return 'Hotel';
+  if (payment.account === 'Hulla') return 'Hulla';
+  return 'Cash';
+}
+
+export function expenseAccountBucket(expense: {
+  paymentMode: string;
+  account: PaymentAccount;
+}): AccountBalanceBucket {
+  if (expense.account === 'Hotel') return 'Hotel';
+  if (expense.account === 'Hulla') return 'Hulla';
+  return 'Cash';
+}
+
+export interface AccountBalanceRow {
+  bucket: AccountBalanceBucket;
+  label: string;
+  income: number;
+  expense: number;
+  balance: number;
+}
+
+export function computeAccountBalances(
+  payments: Pick<BookingPayment, 'amount' | 'mode' | 'account'>[],
+  expenses: Pick<Expense, 'amount' | 'paymentMode' | 'account'>[],
+): AccountBalanceRow[] {
+  const totals: Record<AccountBalanceBucket, { income: number; expense: number }> = {
+    Cash: { income: 0, expense: 0 },
+    Hotel: { income: 0, expense: 0 },
+    Hulla: { income: 0, expense: 0 },
+  };
+
+  for (const payment of payments) {
+    const bucket = paymentAccountBucket(payment);
+    totals[bucket].income = round2(totals[bucket].income + (Number(payment.amount) || 0));
+  }
+
+  for (const expense of expenses) {
+    const bucket = expenseAccountBucket(expense);
+    totals[bucket].expense = round2(totals[bucket].expense + (Number(expense.amount) || 0));
+  }
+
+  return ACCOUNT_BALANCE_BUCKETS.map((bucket) => ({
+    bucket,
+    label: ACCOUNT_BALANCE_LABELS[bucket],
+    income: totals[bucket].income,
+    expense: totals[bucket].expense,
+    balance: round2(totals[bucket].income - totals[bucket].expense),
+  }));
 }
