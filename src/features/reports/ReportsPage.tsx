@@ -21,6 +21,8 @@ import { useDateRange } from "@/hooks/useDateRange";
 import { inRange } from "@/utils/dateRange";
 import {
   bookingExtrasIncome,
+  bookingPendingAmount,
+  bookingPendingBreakdown,
   bookingRoomIncome,
   bookingTotalIncome,
   calculatePaymentStatus,
@@ -60,7 +62,7 @@ function collectPayments(bookings: Booking[], range: DateRange): PaymentRow[] {
 }
 
 function bookingPending(b: Booking) {
-  return Math.max(b.balanceAmount, 0);
+  return bookingPendingAmount(b);
 }
 
 export default function ReportsPage() {
@@ -417,19 +419,23 @@ function buildReport(
             bookingPending(b) > 0 &&
             inRange(b.checkInDate, range),
         )
-        .map((b) => ({
+        .map((b) => {
+          const breakdown = bookingPendingBreakdown(b);
+          return {
           Date: formatDate(b.checkInDate),
           Guest: b.guestName || "—",
           Room: b.roomNumber || "—",
-          Total: b.totalAmount,
-          Paid: b.paidAmount,
+          Total: breakdown.grandTotal,
+          Paid: breakdown.paid,
+          "Extras Due": breakdown.extrasPending,
           Pending: bookingPending(b),
           Status: calculatePaymentStatus(
-            b.totalAmount,
-            b.paidAmount,
+            breakdown.grandTotal,
+            breakdown.paid,
             b.checkOutDate,
           ),
-        }));
+        };
+        });
       return {
         rows,
         columns: [
@@ -438,6 +444,7 @@ function buildReport(
           { key: "Room", label: "Room" },
           { key: "Total", label: "Total", align: "right", money: true },
           { key: "Paid", label: "Paid", align: "right", money: true },
+          { key: "Extras Due", label: "Extras Due", align: "right", money: true },
           { key: "Pending", label: "Pending", align: "right", money: true },
           { key: "Status", label: "Status" },
         ],
@@ -510,8 +517,9 @@ function buildReport(
           "Room Service": b.roomService || 0,
           Food: b.foodAmount || 0,
           Other: round2(
-            (b.otherCharges || 0) +
-              (b.extraCharges || []).reduce((s, c) => s + c.amount, 0),
+            (b.extraCharges?.length
+              ? (b.extraCharges || []).reduce((s, c) => s + c.amount, 0)
+              : b.otherCharges) || 0,
           ),
           Total: bookingExtrasIncome(b),
         }));

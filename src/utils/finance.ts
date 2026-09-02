@@ -109,11 +109,12 @@ export function bookingRoomIncome(
 export function bookingExtrasIncome(
   b: Pick<Booking, 'roomService' | 'foodAmount' | 'otherCharges' | 'extraCharges'>,
 ): number {
+  const itemizedExtras = sumExtraCharges(b.extraCharges);
+  const extras = itemizedExtras > 0 ? itemizedExtras : Number(b.otherCharges) || 0;
   return round2(
     (Number(b.roomService) || 0) +
       (Number(b.foodAmount) || 0) +
-      (Number(b.otherCharges) || 0) +
-      sumExtraCharges(b.extraCharges),
+      extras,
   );
 }
 
@@ -191,9 +192,34 @@ export function computeSplitBookingBill(input: {
     allPaid,
     grandTotal,
     totalAmount: grandTotal,
-    balanceAmount: roomBill.balanceAmount,
+    balanceAmount: round2(Math.max(grandTotal - allPaid, 0)),
     otherCharges: extrasTotal,
   };
+}
+
+export function bookingPendingBreakdown(booking: Booking) {
+  const roomTotal = booking.roomAmount || booking.roomRate * booking.nights;
+  const bill = computeSplitBookingBill({
+    roomAmount: roomTotal,
+    extraCharges: booking.extraCharges,
+    foodAmount: booking.foodAmount,
+    roomService: booking.roomService,
+    discount: booking.discount,
+    taxPercent: booking.taxPercent,
+    payments: resolveBookingPayments(booking),
+  });
+  const total = round2(Math.max(bill.grandTotal - bill.allPaid, 0));
+  return {
+    roomPending: bill.roomBalance,
+    extrasPending: bill.extrasPending,
+    total,
+    grandTotal: bill.grandTotal,
+    paid: bill.allPaid,
+  };
+}
+
+export function bookingPendingAmount(booking: Booking): number {
+  return bookingPendingBreakdown(booking).total;
 }
 
 export function calculatePendingAmount(totalAmount: number, paidAmount: number): number {

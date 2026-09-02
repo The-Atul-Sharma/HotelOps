@@ -10,6 +10,7 @@ import { PAYMENT_MODES } from '@/config/constants';
 import { inRange } from '@/utils/dateRange';
 import {
   bookingExtrasIncome,
+  bookingPendingAmount,
   bookingRoomIncome,
   bookingTotalIncome,
   calculatePaymentStatus,
@@ -23,7 +24,7 @@ function isActiveBooking(b: Booking) {
 }
 
 function bookingPending(b: Booking) {
-  return Math.max(b.balanceAmount, 0);
+  return bookingPendingAmount(b);
 }
 
 function bookingPayments(b: Booking): BookingPayment[] {

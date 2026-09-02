@@ -20,18 +20,19 @@ import {
 import { useBookings } from '@/hooks/useEntities';
 import { usePagination } from '@/hooks/usePagination';
 import { useDateRange } from '@/hooks/useDateRange';
-import { calculatePaymentStatus, round2 } from '@/utils/finance';
+import { calculatePaymentStatus, bookingPendingAmount, bookingPendingBreakdown, round2 } from '@/utils/finance';
 import { formatDate } from '@/utils/format';
 import { inRange } from '@/utils/dateRange';
 import { cn } from '@/lib/utils';
 import type { Booking, PaymentStatus } from '@/types';
 
 function bookingPending(b: Booking) {
-  return Math.max(b.balanceAmount, 0);
+  return bookingPendingAmount(b);
 }
 
 function bookingStatus(b: Booking): PaymentStatus {
-  return calculatePaymentStatus(b.totalAmount, b.paidAmount, b.checkOutDate);
+  const { grandTotal, paid } = bookingPendingBreakdown(b);
+  return calculatePaymentStatus(grandTotal, paid, b.checkOutDate);
 }
 
 export default function PendingPaymentsPage() {
@@ -73,7 +74,7 @@ export default function PendingPaymentsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Pending Payments"
-        description="Outstanding balances from bookings. Collect from the booking detail page."
+        description="Outstanding room rent and extra charges from bookings."
         actions={
           <div className="flex flex-wrap gap-2">
             <DateRangeFilter {...filterProps} />
@@ -129,13 +130,16 @@ export default function PendingPaymentsPage() {
                   <TableHead>Stay</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead className="text-right">Paid</TableHead>
+                  <TableHead className="text-right">Extras Due</TableHead>
                   <TableHead className="text-right">Pending</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pageItems.map(({ booking: b, status, pending: due }) => (
+                {pageItems.map(({ booking: b, status, pending: due }) => {
+                  const breakdown = bookingPendingBreakdown(b);
+                  return (
                   <TableRow
                     key={b.id}
                     className={cn(
@@ -154,10 +158,13 @@ export default function PendingPaymentsPage() {
                       {formatDate(b.checkInDate, 'DD MMM')} → {formatDate(b.checkOutDate, 'DD MMM')}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Money value={b.totalAmount} />
+                      <Money value={breakdown.grandTotal} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <Money value={b.paidAmount} />
+                      <Money value={breakdown.paid} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Money value={breakdown.extrasPending} colored={breakdown.extrasPending > 0} />
                     </TableCell>
                     <TableCell className="text-right">
                       <Money value={due} colored />
@@ -173,7 +180,8 @@ export default function PendingPaymentsPage() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

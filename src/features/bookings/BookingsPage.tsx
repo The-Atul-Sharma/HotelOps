@@ -22,7 +22,7 @@ import { usePagination } from '@/hooks/usePagination';
 import { DateRangeFilter } from '@/components/shared/DateRangeFilter';
 import { BookingFormDialog } from './BookingFormDialog';
 import { BookingCheckoutDialog } from './BookingCheckoutDialog';
-import { calculatePaymentStatus, sumExtraCharges } from '@/utils/finance';
+import { bookingPendingAmount, bookingPendingBreakdown, calculatePaymentStatus, sumExtraCharges } from '@/utils/finance';
 import { formatDate } from '@/utils/format';
 import { inRange } from '@/utils/dateRange';
 import { useDateRange } from '@/hooks/useDateRange';
@@ -158,10 +158,16 @@ export default function BookingsPage() {
                       <Money value={b.totalAmount} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <Money value={b.balanceAmount} colored />
+                      <Money value={bookingPendingAmount(b)} colored />
                     </TableCell>
                     <TableCell>
-                      <PaymentStatusBadge status={calculatePaymentStatus(b.totalAmount, b.paidAmount)} />
+                      <PaymentStatusBadge
+                        status={calculatePaymentStatus(
+                          bookingPendingBreakdown(b).grandTotal,
+                          bookingPendingBreakdown(b).paid,
+                          b.checkOutDate,
+                        )}
+                      />
                     </TableCell>
                     <TableCell>
                       <BookingStatusBadge status={b.status} />
