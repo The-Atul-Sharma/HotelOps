@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "db:seed": "node --env-file=.env scripts/seed-supabase.mjs",
-    "db:seed:sql": "node scripts/generate-seed-sql.mjs"
+    "db:seed:sql": "node scripts/generate-seed-sql.mjs",
+    "pwa:icons": "node scripts/generate-pwa-icons.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -46,6 +47,7 @@
     "@vitejs/plugin-react": "^6.1.0",
     "oxlint": "^1.79.0",
     "postcss": "^8.5.26",
+    "sharp": "^0.35.4",
     "tailwindcss": "^4.3.3",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "~6.0.2",
