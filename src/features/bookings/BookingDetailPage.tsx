@@ -57,7 +57,7 @@ import { formatDate, formatINR, formatRoomTariffLabel } from '@/utils/format';
 import { BookingFormDialog } from './BookingFormDialog';
 import { BookingCheckoutDialog } from './BookingCheckoutDialog';
 import { buildSettledExtras } from './bookingCheckout';
-import { buildExtraCharge, formatExtraChargeLabel, extraChargeName, recalculateExtraCharge } from './bookingUtils';
+import { buildExtraCharge, formatExtraChargeLabel, extraChargeName, recalculateExtraCharge, groupExtraChargesForDisplay, formatGroupedExtraChargeLabel } from './bookingUtils';
 import { Invoice } from './Invoice';
 import { PAYMENT_MODES, PAYMENT_ACCOUNTS, formatPaymentAccount, EXTRA_CHARGE_ITEM_TYPES } from '@/config/constants';
 import type { BookingCharge, BookingPayment, ExtraChargeItemType, PaymentAccount, PaymentMode } from '@/types';
@@ -532,17 +532,13 @@ export default function BookingDetailPage() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Extra Charges
                 </p>
-                {extraCharges.map((c) => {
-                  const paid = isExtraChargePaid(c, payments);
-                  return (
-                    <Row
-                      key={c.id}
-                      label={`${formatExtraChargeLabel(c)}${paid ? ` (${c.paymentMode})` : ''} · ${paid ? 'Paid' : 'Pending'}`}
-                      value={c.amount}
-                      danger={!paid}
-                    />
-                  );
-                })}
+                {groupExtraChargesForDisplay(extraCharges).map((g) => (
+                  <Row
+                    key={g.key}
+                    label={formatGroupedExtraChargeLabel(g)}
+                    value={g.amount}
+                  />
+                ))}
                 {bill.extrasPending > 0 && (
                   <Row label="Extras Pending" value={bill.extrasPending} danger />
                 )}

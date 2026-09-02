@@ -2,12 +2,13 @@ import { forwardRef } from 'react';
 import type { Booking, HotelSettings } from '@/types';
 import { formatINR, formatDate, formatRoomTariffLabel } from '@/utils/format';
 import { bookingRoomTotal, computeBookingBill, round2 } from '@/utils/finance';
-import { formatExtraChargeLabel } from './bookingUtils';
+import { groupExtraChargesForDisplay, formatGroupedExtraChargeLabel } from './bookingUtils';
 
 export const Invoice = forwardRef<HTMLDivElement, { booking: Booking; settings: HotelSettings }>(
   function Invoice({ booking, settings }, ref) {
     const roomTotal = bookingRoomTotal(booking);
     const extraCharges = booking.extraCharges ?? [];
+    const groupedExtras = groupExtraChargesForDisplay(extraCharges);
     const taxPercent =
       booking.taxPercent > 0 ? booking.taxPercent : settings.taxPercent || 0;
     const bill = computeBookingBill({
@@ -95,15 +96,15 @@ export const Invoice = forwardRef<HTMLDivElement, { booking: Booking; settings: 
                 <td className="py-1.5 text-right">{formatINR(booking.roomService)}</td>
               </tr>
             )}
-            {extraCharges.map((c) => (
-              <tr key={c.id} className="border-b border-gray-300">
+            {groupedExtras.map((g) => (
+              <tr key={g.key} className="border-b border-gray-300">
                 <td className="py-1.5">
-                  {formatExtraChargeLabel(c)}
-                  {(c.quantity ?? 1) > 1 && c.unitPrice != null && (
-                    <span className="text-gray-600"> @ {formatINR(c.unitPrice)}</span>
+                  {formatGroupedExtraChargeLabel(g)}
+                  {g.quantity > 1 && (
+                    <span className="text-gray-600"> @ {formatINR(g.unitPrice)}</span>
                   )}
                 </td>
-                <td className="py-1.5 text-right">{formatINR(c.amount)}</td>
+                <td className="py-1.5 text-right">{formatINR(g.amount)}</td>
               </tr>
             ))}
           </tbody>

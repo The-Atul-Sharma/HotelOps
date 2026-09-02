@@ -16,6 +16,7 @@ export const EXTRA_CHARGE_ITEM_TYPES: ExtraChargeItemType[] = [
   'Ice Qube',
   'Peanut Masala',
   'Tea',
+  'Soda',
   'Food',
   'Other',
 ];

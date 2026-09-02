@@ -27,6 +27,56 @@ export function formatExtraChargeDetail(charge: BookingCharge): string {
   return formatINR(charge.amount);
 }
 
+export interface GroupedExtraCharge {
+  key: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+}
+
+function extraChargeGroupKey(charge: BookingCharge): string {
+  const name = extraChargeName(charge);
+  const qty = charge.quantity ?? 1;
+  const unitPrice =
+    charge.unitPrice ?? (qty > 0 ? round2(charge.amount / qty) : charge.amount);
+  if (charge.itemType === 'Other') {
+    return `Other|${charge.customName?.trim() || name}|${unitPrice}`;
+  }
+  if (charge.itemType) {
+    return `${charge.itemType}|${unitPrice}`;
+  }
+  return `${name}|${unitPrice}`;
+}
+
+export function groupExtraChargesForDisplay(
+  charges: BookingCharge[],
+): GroupedExtraCharge[] {
+  const map = new Map<string, GroupedExtraCharge>();
+  for (const charge of charges) {
+    const key = extraChargeGroupKey(charge);
+    const qty = charge.quantity ?? 1;
+    const unitPrice =
+      charge.unitPrice ?? (qty > 0 ? round2(charge.amount / qty) : charge.amount);
+    const name = extraChargeName(charge);
+    const existing = map.get(key);
+    if (existing) {
+      existing.quantity += qty;
+      existing.amount = round2(existing.amount + charge.amount);
+    } else {
+      map.set(key, { key, name, quantity: qty, unitPrice, amount: charge.amount });
+    }
+  }
+  return Array.from(map.values());
+}
+
+export function formatGroupedExtraChargeLabel(
+  group: Pick<GroupedExtraCharge, 'name' | 'quantity'>,
+): string {
+  if (group.quantity > 1) return `${group.name} × ${group.quantity}`;
+  return group.name;
+}
+
 export function buildExtraCharge(input: {
   itemType: ExtraChargeItemType;
   customName: string;

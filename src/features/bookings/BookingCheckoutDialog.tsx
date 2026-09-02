@@ -20,9 +20,8 @@ import {
 } from '@/components/ui/dialog';
 import { bookingHooks } from '@/hooks/useEntities';
 import { PAYMENT_MODES, PAYMENT_ACCOUNTS, formatPaymentAccount } from '@/config/constants';
-import { isExtraChargePaid } from '@/utils/finance';
 import { formatINR, formatRoomTariffLabel } from '@/utils/format';
-import { formatExtraChargeDetail, formatExtraChargeLabel } from './bookingUtils';
+import { formatExtraChargeDetail, formatExtraChargeLabel, groupExtraChargesForDisplay, formatGroupedExtraChargeLabel } from './bookingUtils';
 import type { Booking, PaymentAccount, PaymentMode } from '@/types';
 import {
   buildCheckoutPatch,
@@ -127,7 +126,7 @@ export function BookingCheckoutDialog({
 
   if (!booking || !state) return null;
 
-  const { bill, extraCharges, payments } = state;
+  const { bill, extraCharges } = state;
   const roomBillTotal = bill.roomTotal;
 
   return (
@@ -164,18 +163,14 @@ export function BookingCheckoutDialog({
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Extra Charges
               </p>
-              {extraCharges.map((c) => {
-                const paid = isExtraChargePaid(c, payments);
-                return (
-                  <div key={c.id} className="flex items-start justify-between gap-2">
-                    <span className={`min-w-0 flex-1 ${paid ? 'text-muted-foreground' : 'text-destructive'}`}>
-                      {formatExtraChargeLabel(c)}
-                      {paid ? ` (${c.paymentMode})` : ' · Pending'}
-                    </span>
-                    <Money value={c.amount} className="shrink-0" muteZero={false} />
-                  </div>
-                );
-              })}
+              {groupExtraChargesForDisplay(extraCharges).map((g) => (
+                <div key={g.key} className="flex items-start justify-between gap-2">
+                  <span className="min-w-0 flex-1">
+                    {formatGroupedExtraChargeLabel(g)}
+                  </span>
+                  <Money value={g.amount} className="shrink-0" muteZero={false} />
+                </div>
+              ))}
               {bill.extrasPending > 0 && (
                 <div className="flex justify-between gap-2 border-t pt-2 font-medium">
                   <span className="text-destructive">Extras pending</span>
