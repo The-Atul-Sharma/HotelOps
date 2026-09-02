@@ -10,7 +10,17 @@ import { ConfirmProvider } from '@/components/shared/ConfirmDialog';
 import { router } from '@/router';
 import { bootstrapDataLayer } from '@/services/api';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { clearChunkReloadFlag, isChunkLoadError, reloadForStaleChunk } from '@/lib/chunkLoadError';
 import './index.css';
+
+clearChunkReloadFlag();
+
+window.addEventListener('unhandledrejection', (event) => {
+  if (isChunkLoadError(event.reason)) {
+    event.preventDefault();
+    reloadForStaleChunk();
+  }
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
