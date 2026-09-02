@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import { bookingRoomRate } from '@/utils/finance';
 
 const inrFormatter = new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -32,6 +33,15 @@ export function formatDate(date?: string | Date | null, fmt = 'DD MMM YYYY'): st
 export function formatDateTime(date?: string | Date | null): string {
   if (!date) return '-';
   return dayjs(date).format('DD MMM YYYY, hh:mm A');
+}
+
+export function formatRoomTariffLabel(
+  booking: { roomAmount: number; roomRate: number; nights: number },
+): string {
+  const nights = booking.nights || 1;
+  const rate = bookingRoomRate(booking);
+  const nightWord = nights === 1 ? 'night' : 'nights';
+  return `Room Tariff (${formatINR(rate)} × ${nights} ${nightWord})`;
 }
 
 export function relativeTime(date: string | Date): string {

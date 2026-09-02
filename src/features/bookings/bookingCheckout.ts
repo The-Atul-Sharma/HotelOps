@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import type { Booking, BookingCharge, BookingPayment, HotelSettings, PaymentAccount, PaymentMode } from '@/types';
-import { computeSplitBookingBill, isExtraChargePaid } from '@/utils/finance';
+import { bookingRoomTotal, computeSplitBookingBill, isExtraChargePaid } from '@/utils/finance';
 
 export function getBookingPayments(booking: Booking): BookingPayment[] {
   if (booking.payments?.length) return booking.payments;
@@ -23,7 +23,7 @@ export function resolveTaxPercent(booking: Booking, settings?: HotelSettings | n
 }
 
 export function getBookingBillState(booking: Booking, taxPercent: number) {
-  const roomTotal = booking.roomAmount || booking.roomRate * booking.nights;
+  const roomTotal = bookingRoomTotal(booking);
   const extraCharges = booking.extraCharges ?? [];
   const payments = getBookingPayments(booking);
   const bill = computeSplitBookingBill({
@@ -86,7 +86,7 @@ export function buildCheckoutPatch(
   extras: BookingCharge[],
   pmt: BookingPayment[],
 ) {
-  const roomTotal = booking.roomAmount || booking.roomRate * booking.nights;
+  const roomTotal = bookingRoomTotal(booking);
   const exitBill = computeSplitBookingBill({
     roomAmount: roomTotal,
     extraCharges: extras,
@@ -99,6 +99,7 @@ export function buildCheckoutPatch(
   const lastMode = pmt.length > 0 ? pmt[pmt.length - 1].mode : booking.paymentMode;
   return {
     status: 'Checked Out' as const,
+    roomAmount: roomTotal,
     taxPercent,
     taxAmount: exitBill.taxAmount,
     totalAmount: exitBill.grandTotal,

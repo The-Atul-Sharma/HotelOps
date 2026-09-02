@@ -21,7 +21,7 @@ import {
 import { bookingHooks } from '@/hooks/useEntities';
 import { PAYMENT_MODES, PAYMENT_ACCOUNTS, PAYMENT_ACCOUNT_LABELS } from '@/config/constants';
 import { isExtraChargePaid } from '@/utils/finance';
-import { formatINR } from '@/utils/format';
+import { formatINR, formatRoomTariffLabel } from '@/utils/format';
 import type { Booking, PaymentAccount, PaymentMode } from '@/types';
 import {
   buildCheckoutPatch,
@@ -145,7 +145,7 @@ export function BookingCheckoutDialog({
               Room Bill
             </p>
             <div className="flex justify-between gap-2">
-              <span className="text-muted-foreground">Room total</span>
+              <span className="text-muted-foreground">{formatRoomTariffLabel(booking)}</span>
               <Money value={roomBillTotal} muteZero={false} />
             </div>
             <div className="flex justify-between gap-2">

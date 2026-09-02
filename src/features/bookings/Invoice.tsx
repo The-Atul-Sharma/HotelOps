@@ -1,11 +1,11 @@
 import { forwardRef } from 'react';
 import type { Booking, HotelSettings } from '@/types';
-import { formatINR, formatDate } from '@/utils/format';
-import { computeBookingBill, round2 } from '@/utils/finance';
+import { formatINR, formatDate, formatRoomTariffLabel } from '@/utils/format';
+import { bookingRoomTotal, computeBookingBill, round2 } from '@/utils/finance';
 
 export const Invoice = forwardRef<HTMLDivElement, { booking: Booking; settings: HotelSettings }>(
   function Invoice({ booking, settings }, ref) {
-    const roomTotal = booking.roomAmount || booking.roomRate * booking.nights;
+    const roomTotal = bookingRoomTotal(booking);
     const taxPercent =
       booking.taxPercent > 0 ? booking.taxPercent : settings.taxPercent || 0;
     const bill = computeBookingBill({
@@ -65,8 +65,7 @@ export const Invoice = forwardRef<HTMLDivElement, { booking: Booking; settings: 
           <tbody>
             <tr className="border-b border-gray-300">
               <td className="py-1.5">
-                Room tariff ({booking.nights} night{booking.nights === 1 ? '' : 's'} · Room{' '}
-                {booking.roomNumber})
+                {formatRoomTariffLabel(booking)} · Room {booking.roomNumber}
               </td>
               <td className="py-1.5 text-right">{formatINR(taxable)}</td>
             </tr>

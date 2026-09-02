@@ -28,6 +28,7 @@ import {
 } from '@/hooks/useEntities';
 import { useConfirm } from '@/components/shared/ConfirmDialog';
 import {
+  bookingRoomTotal,
   calculatePaymentStatus,
   computeSplitBookingBill,
   isExtraChargePaid,
@@ -35,7 +36,7 @@ import {
   roomPaymentsOnly,
   sumPayments,
 } from '@/utils/finance';
-import { formatDate, formatINR } from '@/utils/format';
+import { formatDate, formatINR, formatRoomTariffLabel } from '@/utils/format';
 import { BookingFormDialog } from './BookingFormDialog';
 import { BookingCheckoutDialog } from './BookingCheckoutDialog';
 import { buildSettledExtras } from './bookingCheckout';
@@ -82,7 +83,7 @@ export default function BookingDetailPage() {
       />
     );
 
-  const roomTotal = booking.roomAmount || booking.roomRate * booking.nights;
+  const roomTotal = bookingRoomTotal(booking);
   const extraCharges = booking.extraCharges ?? [];
   const payments: BookingPayment[] =
     booking.payments?.length
@@ -336,7 +337,7 @@ export default function BookingDetailPage() {
             <CardTitle className="text-base">Bill Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <Row label="Room Tariff (incl. GST)" value={roomTotal} />
+            <Row label={formatRoomTariffLabel(booking)} value={roomTotal} />
             {taxPercent > 0 && (
               <>
                 <Row label="  Taxable" value={bill.taxable} />

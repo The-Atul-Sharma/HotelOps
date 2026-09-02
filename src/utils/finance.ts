@@ -100,10 +100,27 @@ export function roomPaymentsOnly(
   return payments.filter((p) => !extraPaymentIds.has(p.id));
 }
 
+export function bookingRoomRate(
+  b: Pick<Booking, 'roomAmount' | 'roomRate' | 'nights'>,
+): number {
+  if (b.roomRate > 0) return b.roomRate;
+  if (b.nights > 0 && b.roomAmount > 0) return round2(b.roomAmount / b.nights);
+  return round2(b.roomAmount || 0);
+}
+
+export function bookingRoomTotal(
+  b: Pick<Booking, 'roomAmount' | 'roomRate' | 'nights'>,
+): number {
+  if (b.roomRate > 0 && b.nights > 0) {
+    return round2(b.roomRate * b.nights);
+  }
+  return round2(b.roomAmount || 0);
+}
+
 export function bookingRoomIncome(
   b: Pick<Booking, 'roomAmount' | 'roomRate' | 'nights'>,
 ): number {
-  return round2(b.roomAmount || b.roomRate * b.nights || 0);
+  return bookingRoomTotal(b);
 }
 
 export function bookingExtrasIncome(
@@ -198,7 +215,7 @@ export function computeSplitBookingBill(input: {
 }
 
 export function bookingPendingBreakdown(booking: Booking) {
-  const roomTotal = booking.roomAmount || booking.roomRate * booking.nights;
+  const roomTotal = bookingRoomTotal(booking);
   const bill = computeSplitBookingBill({
     roomAmount: roomTotal,
     extraCharges: booking.extraCharges,

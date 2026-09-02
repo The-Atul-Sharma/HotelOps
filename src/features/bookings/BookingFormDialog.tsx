@@ -35,7 +35,8 @@ import {
   guestHooks,
   notificationHooks,
 } from '@/hooks/useEntities';
-import { calculateNights, computeBookingBill } from '@/utils/finance';
+import { calculateNights, computeBookingBill, round2 } from '@/utils/finance';
+import { formatRoomTariffLabel } from '@/utils/format';
 import { hasConflict } from './bookingUtils';
 import { nextBookingCode } from '@/services/mockData';
 import { PAYMENT_MODES, PAYMENT_ACCOUNTS, PAYMENT_ACCOUNT_LABELS } from '@/config/constants';
@@ -130,7 +131,12 @@ export function BookingFormDialog({
         checkOutDate: booking.checkOutDate,
         adults: booking.adults,
         children: booking.children,
-        roomTariff: booking.roomAmount || booking.totalAmount || undefined,
+        roomTariff:
+          booking.roomRate > 0
+            ? booking.roomRate
+            : booking.nights > 0
+              ? round2((booking.roomAmount || booking.totalAmount || 0) / booking.nights)
+              : booking.roomAmount || booking.totalAmount || undefined,
         advanceReceived: booking.advanceReceived || undefined,
         paymentMode: booking.paymentMode,
         paymentAccount:
@@ -162,7 +168,8 @@ export function BookingFormDialog({
 
   const calc = useMemo(() => {
     const nights = calculateNights(values.checkInDate, values.checkOutDate);
-    const roomAmount = Number(values.roomTariff) || 0;
+    const roomRate = Number(values.roomTariff) || 0;
+    const roomAmount = round2(roomRate * nights);
     const taxPercent = settings?.taxPercent ?? 0;
     const extras = booking?.extraCharges ?? [];
     const bill = computeBookingBill({
@@ -173,6 +180,7 @@ export function BookingFormDialog({
     });
     return {
       nights,
+      roomRate,
       roomAmount,
       extrasTotal: bill.otherCharges,
       taxPercent,
@@ -208,9 +216,9 @@ export function BookingFormDialog({
     }
 
     const nights = calculateNights(v.checkInDate, v.checkOutDate);
-    const roomAmount = Number(v.roomTariff) || 0;
+    const roomRate = Number(v.roomTariff) || 0;
+    const roomAmount = round2(roomRate * nights);
     const advance = Number(v.advanceReceived) || 0;
-    const roomRate = nights > 0 ? Math.round(roomAmount / nights) : roomAmount;
     const taxPercent = settings?.taxPercent ?? 0;
     const extraCharges = booking?.extraCharges ?? [];
     const mode = v.paymentMode as PaymentMode;
@@ -399,8 +407,8 @@ export function BookingFormDialog({
             <Field label="Children">
               <Input type="number" {...register('children')} />
             </Field>
-            <Field label="Room Tariff incl. GST (₹)" error={errors.roomTariff?.message}>
-              <Input type="number" {...register('roomTariff')} placeholder="Amount including GST" />
+            <Field label="Room Tariff incl. GST (₹/night)" error={errors.roomTariff?.message}>
+              <Input type="number" {...register('roomTariff')} placeholder="Per night including GST" />
             </Field>
             <Field label="Advance Received (₹)">
               <Input type="number" {...register('advanceReceived')} />
@@ -451,7 +459,7 @@ export function BookingFormDialog({
             <div className="rounded-lg border bg-muted/40 p-4 sm:col-span-2">
               <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                 <Summary label="Nights" value={calc.nights} isCount />
-                <Summary label="Room (incl. GST)" value={calc.roomAmount} />
+                <Summary label={formatRoomTariffLabel({ roomRate: calc.roomRate, nights: calc.nights, roomAmount: calc.roomAmount })} value={calc.roomAmount} />
                 <Summary label="Total" value={calc.totalAmount} strong />
                 <Summary label="Balance" value={calc.balance} strong danger={calc.balance > 0} />
               </div>
