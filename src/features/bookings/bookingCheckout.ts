@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import type { Booking, BookingCharge, BookingPayment, HotelSettings, PaymentAccount, PaymentMode } from '@/types';
-import { bookingRoomTotal, computeSplitBookingBill, isExtraChargePaid } from '@/utils/finance';
+import { bookingRoomTotal, computeSplitBookingBill, isExtraChargePaid, sumPayments } from '@/utils/finance';
 
 export function getBookingPayments(booking: Booking): BookingPayment[] {
   if (booking.payments?.length) return booking.payments;
@@ -22,28 +22,66 @@ export function resolveTaxPercent(booking: Booking, settings?: HotelSettings | n
   return booking.taxPercent > 0 ? booking.taxPercent : (settings?.taxPercent ?? 0);
 }
 
-export function getBookingBillState(booking: Booking, taxPercent: number) {
+export function getBookingBillState(
+  booking: Booking,
+  taxPercent: number,
+  discount?: number,
+  payments?: BookingPayment[],
+) {
   const roomTotal = bookingRoomTotal(booking);
   const extraCharges = booking.extraCharges ?? [];
-  const payments = getBookingPayments(booking);
+  const resolvedPayments = payments ?? getBookingPayments(booking);
+  const appliedDiscount = discount ?? booking.discount ?? 0;
   const bill = computeSplitBookingBill({
     roomAmount: roomTotal,
     extraCharges,
     foodAmount: booking.foodAmount,
     roomService: booking.roomService,
-    discount: booking.discount,
+    discount: appliedDiscount,
     taxPercent,
-    payments,
+    payments: resolvedPayments,
   });
-  const pendingExtras = extraCharges.filter((c) => !isExtraChargePaid(c, payments));
+  const pendingExtras = extraCharges.filter((c) => !isExtraChargePaid(c, resolvedPayments));
   return {
     roomTotal,
     extraCharges,
-    payments,
+    payments: resolvedPayments,
     bill,
     pendingExtras,
     balance: bill.roomBalance,
     grandTotal: bill.grandTotal,
+  };
+}
+
+export function buildPaymentPatch(
+  booking: Booking,
+  taxPercent: number,
+  payments: BookingPayment[],
+  discount?: number,
+) {
+  const roomTotal = bookingRoomTotal(booking);
+  const extraCharges = booking.extraCharges ?? [];
+  const appliedDiscount = discount ?? booking.discount ?? 0;
+  const bill = computeSplitBookingBill({
+    roomAmount: roomTotal,
+    extraCharges,
+    foodAmount: booking.foodAmount,
+    roomService: booking.roomService,
+    discount: appliedDiscount,
+    taxPercent,
+    payments,
+  });
+  const paid = sumPayments(payments);
+  const lastMode = payments.length > 0 ? payments[payments.length - 1].mode : booking.paymentMode;
+  return {
+    discount: appliedDiscount,
+    payments,
+    taxPercent,
+    taxAmount: bill.taxAmount,
+    totalAmount: bill.grandTotal,
+    paidAmount: paid,
+    balanceAmount: bill.balanceAmount,
+    paymentMode: lastMode,
   };
 }
 
@@ -52,9 +90,10 @@ export function buildSettledExtras(
   chargeIds: string[],
   modes?: Record<string, PaymentMode>,
   accounts?: Record<string, PaymentAccount>,
+  payments?: BookingPayment[],
 ): { nextExtras: BookingCharge[]; nextPayments: BookingPayment[] } {
   const extraCharges = booking.extraCharges ?? [];
-  const payments = getBookingPayments(booking);
+  const currentPayments = payments ?? getBookingPayments(booking);
   const idSet = new Set(chargeIds);
   const nextExtras = extraCharges.map((c) => {
     if (!idSet.has(c.id)) return c;
@@ -62,10 +101,10 @@ export function buildSettledExtras(
     const account = accounts?.[c.id] ?? c.account ?? 'None';
     return { ...c, paidAtOrder: true, paymentMode: mode, account };
   });
-  const nextPayments = [...payments];
+  const nextPayments = [...currentPayments];
   for (const chargeId of chargeIds) {
     const charge = extraCharges.find((c) => c.id === chargeId);
-    if (!charge || isExtraChargePaid(charge, payments)) continue;
+    if (!charge || isExtraChargePaid(charge, currentPayments)) continue;
     const mode = modes?.[chargeId] ?? charge.paymentMode;
     const account = accounts?.[chargeId] ?? charge.account ?? 'None';
     nextPayments.push({
@@ -85,14 +124,16 @@ export function buildCheckoutPatch(
   taxPercent: number,
   extras: BookingCharge[],
   pmt: BookingPayment[],
+  discount?: number,
 ) {
   const roomTotal = bookingRoomTotal(booking);
+  const appliedDiscount = discount ?? booking.discount ?? 0;
   const exitBill = computeSplitBookingBill({
     roomAmount: roomTotal,
     extraCharges: extras,
     foodAmount: booking.foodAmount,
     roomService: booking.roomService,
-    discount: booking.discount,
+    discount: appliedDiscount,
     taxPercent,
     payments: pmt,
   });
@@ -100,6 +141,7 @@ export function buildCheckoutPatch(
   return {
     status: 'Checked Out' as const,
     roomAmount: roomTotal,
+    discount: appliedDiscount,
     taxPercent,
     taxAmount: exitBill.taxAmount,
     totalAmount: exitBill.grandTotal,

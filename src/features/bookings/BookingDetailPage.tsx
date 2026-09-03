@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -88,8 +88,14 @@ export default function BookingDetailPage() {
   const [collectAccounts, setCollectAccounts] = useState<Record<string, PaymentAccount>>({});
   const [chargeEdits, setChargeEdits] = useState<Record<string, { quantity: string; unitPrice: string }>>({});
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [discountInput, setDiscountInput] = useState('0');
+  const [applyingDiscount, setApplyingDiscount] = useState(false);
 
   const booking = useMemo(() => bookings.find((b) => b.id === id), [bookings, id]);
+
+  useEffect(() => {
+    if (booking) setDiscountInput(String(booking.discount || 0));
+  }, [booking?.id, booking?.discount]);
 
   if (isLoading) return <LoadingState />;
   if (!booking)
@@ -142,12 +148,13 @@ export default function BookingDetailPage() {
     patch: Partial<typeof booking> = {},
   ) => {
     const paid = sumPayments(nextPayments);
+    const appliedDiscount = patch.discount ?? booking.discount;
     const nextBill = computeSplitBookingBill({
       roomAmount: roomTotal,
       extraCharges: nextExtras,
       foodAmount: booking.foodAmount,
       roomService: booking.roomService,
-      discount: booking.discount,
+      discount: appliedDiscount,
       taxPercent,
       payments: nextPayments,
     });
@@ -170,6 +177,38 @@ export default function BookingDetailPage() {
         ...patch,
       },
     });
+  };
+
+  const applyDiscount = async () => {
+    const discount = round2(Number(discountInput) || 0);
+    if (discount > roomTotal) {
+      toast.error('Discount cannot exceed room amount');
+      return;
+    }
+    setApplyingDiscount(true);
+    try {
+      const nextBill = computeSplitBookingBill({
+        roomAmount: roomTotal,
+        extraCharges,
+        foodAmount: booking.foodAmount,
+        roomService: booking.roomService,
+        discount,
+        taxPercent,
+        payments,
+      });
+      await update.mutateAsync({
+        id: booking.id,
+        patch: {
+          discount,
+          taxAmount: nextBill.taxAmount,
+          totalAmount: nextBill.grandTotal,
+          balanceAmount: nextBill.balanceAmount,
+        },
+      });
+      toast.success('Discount applied');
+    } finally {
+      setApplyingDiscount(false);
+    }
   };
 
   const addExtraCharge = async () => {
@@ -505,6 +544,7 @@ export default function BookingDetailPage() {
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <Row label={formatRoomTariffLabel(booking)} value={roomTotal} />
+            {booking.discount > 0 && <Row label="Discount" value={-booking.discount} />}
             {taxPercent > 0 && (
               <>
                 <Row label="  Taxable" value={bill.taxable} />
@@ -556,6 +596,42 @@ export default function BookingDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Discount</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="space-y-1.5 flex-1">
+              <Label className="text-xs">Discount (₹)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={discountInput}
+                onChange={(e) => setDiscountInput(e.target.value)}
+                placeholder="0"
+                disabled={booking.status === 'Checked Out'}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    applyDiscount();
+                  }
+                }}
+              />
+            </div>
+            {booking.status !== 'Checked Out' && (
+              <Button
+                onClick={applyDiscount}
+                disabled={applyingDiscount}
+                className="w-full sm:w-auto"
+              >
+                Apply
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

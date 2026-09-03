@@ -185,6 +185,7 @@ export function BookingFormDialog({
     const bill = computeBookingBill({
       roomAmount,
       extraCharges: extras,
+      discount: booking?.discount ?? 0,
       taxPercent,
       paidAmount: Number(values.advanceReceived) || 0,
     });
@@ -288,6 +289,7 @@ export function BookingFormDialog({
     const bill = computeBookingBill({
       roomAmount,
       extraCharges,
+      discount: booking?.discount ?? 0,
       taxPercent,
       paidAmount,
     });

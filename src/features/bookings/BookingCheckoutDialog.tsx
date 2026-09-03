@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import dayjs from 'dayjs';
 import { Money } from '@/components/shared/Money';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -18,15 +21,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { bookingHooks } from '@/hooks/useEntities';
+import { bookingHooks, notificationHooks } from '@/hooks/useEntities';
 import { PAYMENT_MODES, PAYMENT_ACCOUNTS, formatPaymentAccount } from '@/config/constants';
 import { formatINR, formatRoomTariffLabel } from '@/utils/format';
+import { roomPaymentsOnly, round2 } from '@/utils/finance';
 import { formatExtraChargeDetail, formatExtraChargeLabel, groupExtraChargesForDisplay, formatGroupedExtraChargeLabel } from './bookingUtils';
-import type { Booking, PaymentAccount, PaymentMode } from '@/types';
+import type { Booking, BookingPayment, PaymentAccount, PaymentMode } from '@/types';
 import {
   buildCheckoutPatch,
+  buildPaymentPatch,
   buildSettledExtras,
   getBookingBillState,
+  getBookingPayments,
   resolveTaxPercent,
 } from './bookingCheckout';
 
@@ -46,22 +52,41 @@ export function BookingCheckoutDialog({
   onComplete,
 }: BookingCheckoutDialogProps) {
   const update = bookingHooks.useUpdate();
+  const createNotification = notificationHooks.useCreate();
+  const [payments, setPayments] = useState<BookingPayment[]>([]);
   const [settleIds, setSettleIds] = useState<Set<string>>(new Set());
   const [collectModes, setCollectModes] = useState<Record<string, PaymentMode>>({});
   const [collectAccounts, setCollectAccounts] = useState<Record<string, PaymentAccount>>({});
+  const [discountInput, setDiscountInput] = useState('0');
+  const [payAmount, setPayAmount] = useState('');
+  const [payMode, setPayMode] = useState<PaymentMode>('Cash');
+  const [payAccount, setPayAccount] = useState<PaymentAccount>('None');
   const [submitting, setSubmitting] = useState(false);
+  const [recordingPayment, setRecordingPayment] = useState(false);
 
   const taxPercent = booking
     ? (taxPercentProp ?? resolveTaxPercent(booking))
     : 0;
-  const state = booking ? getBookingBillState(booking, taxPercent) : null;
+  const discountAmount = round2(Number(discountInput) || 0);
+  const state = useMemo(
+    () => (booking ? getBookingBillState(booking, taxPercent, discountAmount, payments) : null),
+    [booking, taxPercent, discountAmount, payments],
+  );
   const pendingExtras = state?.pendingExtras ?? [];
   const balance = state?.balance ?? 0;
   const grandTotal = state?.grandTotal ?? 0;
+  const roomPayments = state ? roomPaymentsOnly(state.payments, state.extraCharges) : [];
 
   useEffect(() => {
     if (!open || !booking) return;
-    const pending = getBookingBillState(booking, taxPercent).pendingExtras;
+    const initialPayments = getBookingPayments(booking);
+    const initialDiscount = booking.discount || 0;
+    setDiscountInput(String(initialDiscount));
+    setPayments(initialPayments);
+    setPayAmount('');
+    setPayMode('Cash');
+    setPayAccount('None');
+    const pending = getBookingBillState(booking, taxPercent, initialDiscount, initialPayments).pendingExtras;
     setSettleIds(new Set(pending.map((c) => c.id)));
     setCollectModes(Object.fromEntries(pending.map((c) => [c.id, c.paymentMode])));
     setCollectAccounts(Object.fromEntries(pending.map((c) => [c.id, c.account ?? 'None'])));
@@ -69,14 +94,14 @@ export function BookingCheckoutDialog({
 
   const finishCheckOut = async (
     extras = state?.extraCharges ?? [],
-    pmt = state?.payments ?? [],
+    pmt = payments,
   ) => {
     if (!booking) return;
     setSubmitting(true);
     try {
       await update.mutateAsync({
         id: booking.id,
-        patch: buildCheckoutPatch(booking, taxPercent, extras, pmt),
+        patch: buildCheckoutPatch(booking, taxPercent, extras, pmt, discountAmount),
       });
       onOpenChange(false);
       toast.success(`Room ${booking.roomNumber} checked out`);
@@ -86,8 +111,51 @@ export function BookingCheckoutDialog({
     }
   };
 
+  const recordPayment = async () => {
+    if (!booking) return;
+    const amount = Number(payAmount);
+    if (!amount || amount <= 0) {
+      toast.error('Enter a valid payment amount');
+      return;
+    }
+    if (amount > balance) {
+      toast.error(`Amount exceeds balance of ${formatINR(balance)}`);
+      return;
+    }
+    const entry: BookingPayment = {
+      id: `pay-${Date.now()}`,
+      amount,
+      mode: payMode,
+      account: payAccount,
+      date: dayjs().format('YYYY-MM-DD'),
+    };
+    const nextPayments = [...payments, entry];
+    setRecordingPayment(true);
+    try {
+      await update.mutateAsync({
+        id: booking.id,
+        patch: buildPaymentPatch(booking, taxPercent, nextPayments, discountAmount),
+      });
+      setPayments(nextPayments);
+      setPayAmount('');
+      createNotification.mutate({
+        type: 'Payment Received',
+        title: 'Payment received',
+        message: `${formatINR(amount)} (${payMode}) from ${booking.guestName}`,
+        read: false,
+      });
+      toast.success(`${formatINR(amount)} recorded as ${payMode}`);
+    } finally {
+      setRecordingPayment(false);
+    }
+  };
+
   const confirmCheckOut = async () => {
     if (!booking || !state) return;
+    if (discountAmount > state.roomTotal) {
+      toast.error('Discount cannot exceed room amount');
+      return;
+    }
     if (balance > 0) {
       toast.error(`Collect room rent of ${formatINR(balance)} before checkout.`);
       return;
@@ -106,12 +174,13 @@ export function BookingCheckoutDialog({
         [...settleIds],
         collectModes,
         collectAccounts,
+        payments,
       );
       setSubmitting(true);
       try {
         await update.mutateAsync({
           id: booking.id,
-          patch: buildCheckoutPatch(booking, taxPercent, nextExtras, nextPayments),
+          patch: buildCheckoutPatch(booking, taxPercent, nextExtras, nextPayments, discountAmount),
         });
         onOpenChange(false);
         toast.success(`Room ${booking.roomNumber} checked out`);
@@ -146,6 +215,26 @@ export function BookingCheckoutDialog({
             </p>
             <div className="flex justify-between gap-2">
               <span className="text-muted-foreground">{formatRoomTariffLabel(booking)}</span>
+              <Money value={state.roomTotal} muteZero={false} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Discount (₹)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={discountInput}
+                onChange={(e) => setDiscountInput(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+            {discountAmount > 0 && (
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Discount applied</span>
+                <Money value={-discountAmount} muteZero={false} />
+              </div>
+            )}
+            <div className="flex justify-between gap-2 font-medium">
+              <span className="text-muted-foreground">Room total</span>
               <Money value={roomBillTotal} muteZero={false} />
             </div>
             <div className="flex justify-between gap-2">
@@ -156,6 +245,93 @@ export function BookingCheckoutDialog({
               <span className={balance > 0 ? 'text-destructive' : ''}>Room due</span>
               <Money value={balance} colored={balance > 0} muteZero={false} />
             </div>
+          </div>
+
+          <div className="space-y-3 rounded-lg border p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Record Payment
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Room rent collections only — pending extras are collected separately.
+            </p>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Amount (₹)</Label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Mode</Label>
+                  <Select
+                    value={payMode}
+                    onValueChange={(v) => {
+                      const mode = v as PaymentMode;
+                      setPayMode(mode);
+                      if (mode === 'Cash') setPayAccount('None');
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_MODES.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Account</Label>
+                  <Select
+                    value={payAccount}
+                    onValueChange={(v) => setPayAccount(v as PaymentAccount)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_ACCOUNTS.map((a) => (
+                        <SelectItem key={a} value={a}>
+                          {formatPaymentAccount(a)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <Button
+                className="w-full"
+                onClick={recordPayment}
+                disabled={balance <= 0 || recordingPayment}
+              >
+                {balance <= 0 ? 'Fully Paid' : recordingPayment ? 'Recording…' : 'Add Payment'}
+              </Button>
+            </div>
+            {roomPayments.length > 0 && (
+              <div className="divide-y rounded-lg border">
+                {roomPayments.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="font-medium">{formatINR(p.amount)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {p.mode}
+                        {p.account && p.account !== 'None' ? ` · ${formatPaymentAccount(p.account)}` : ''}
+                        {p.note ? ` · ${p.note}` : ''}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground">{p.date}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {extraCharges.length > 0 && (

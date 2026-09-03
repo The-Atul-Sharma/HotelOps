@@ -70,8 +70,14 @@ export const Invoice = forwardRef<HTMLDivElement, { booking: Booking; settings: 
               <td className="py-1.5">
                 {formatRoomTariffLabel(booking)} · Room {booking.roomNumber}
               </td>
-              <td className="py-1.5 text-right">{formatINR(taxable)}</td>
+              <td className="py-1.5 text-right">{formatINR(roomTotal)}</td>
             </tr>
+            {booking.discount > 0 && (
+              <tr className="border-b border-gray-300">
+                <td className="py-1.5">Discount</td>
+                <td className="py-1.5 text-right">-{formatINR(booking.discount)}</td>
+              </tr>
+            )}
             {taxPercent > 0 && (
               <>
                 <tr className="border-b border-gray-300">
