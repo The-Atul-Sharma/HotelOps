@@ -235,6 +235,7 @@ export interface Advance {
   amount: number;
   purpose?: string;
   paymentMode: PaymentMode;
+  account: PaymentAccount;
   recoveredAmount: number;
   remainingAmount: number;
   status: AdvanceStatus;

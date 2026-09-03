@@ -32,12 +32,12 @@ import {
 import { useAdvances, advanceHooks } from '@/hooks/useEntities';
 import { usePagination } from '@/hooks/usePagination';
 import { useDateRange } from '@/hooks/useDateRange';
-import { ADVANCE_TYPES, PAYMENT_MODES } from '@/config/constants';
+import { ADVANCE_TYPES, PAYMENT_ACCOUNTS, PAYMENT_MODES, formatPaymentAccount } from '@/config/constants';
 import { round2 } from '@/utils/finance';
 import { formatDate, formatINR } from '@/utils/format';
 import { inRange } from '@/utils/dateRange';
 import dayjs from 'dayjs';
-import type { Advance, AdvanceType, PaymentMode } from '@/types';
+import type { Advance, AdvanceType, PaymentAccount, PaymentMode } from '@/types';
 
 const schema = z.object({
   date: z.string().min(1),
@@ -46,6 +46,7 @@ const schema = z.object({
   amount: z.coerce.number().positive('Amount must be positive'),
   purpose: z.string().optional(),
   paymentMode: z.enum(PAYMENT_MODES as [PaymentMode, ...PaymentMode[]]),
+  account: z.enum(PAYMENT_ACCOUNTS as [PaymentAccount, ...PaymentAccount[]]),
 });
 type FormValues = z.input<typeof schema>;
 
@@ -54,6 +55,7 @@ const emptyForm = (): FormValues => ({
   type: 'Staff',
   amount: undefined,
   paymentMode: 'Cash',
+  account: 'None',
   person: '',
   purpose: '',
 });
@@ -109,6 +111,7 @@ export default function AdvancesPage() {
       amount: a.amount,
       purpose: a.purpose ?? '',
       paymentMode: a.paymentMode ?? 'Cash',
+      account: a.account ?? 'None',
     });
     setOpen(true);
   };
@@ -122,6 +125,7 @@ export default function AdvancesPage() {
       amount,
       purpose: v.purpose,
       paymentMode: v.paymentMode as PaymentMode,
+      account: v.account as PaymentAccount,
       recoveredAmount: editing?.recoveredAmount ?? 0,
       remainingAmount: amount,
       status: editing?.status ?? 'Open',
@@ -200,6 +204,7 @@ export default function AdvancesPage() {
                   <TableHead>Type</TableHead>
                   <TableHead>Purpose</TableHead>
                   <TableHead>Payment Mode</TableHead>
+                  <TableHead>Account</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -212,6 +217,7 @@ export default function AdvancesPage() {
                     <TableCell>{a.type}</TableCell>
                     <TableCell>{a.purpose || '—'}</TableCell>
                     <TableCell>{a.paymentMode ?? '—'}</TableCell>
+                    <TableCell>{formatPaymentAccount(a.account)}</TableCell>
                     <TableCell className="text-right">
                       <Money value={a.amount} />
                     </TableCell>
@@ -279,23 +285,46 @@ export default function AdvancesPage() {
             <F label="Amount (₹)" error={errors.amount?.message}>
               <Input type="number" {...register('amount')} />
             </F>
-            <F label="Payment Mode">
-              <Select
-                value={watch('paymentMode')}
-                onValueChange={(v) => setValue('paymentMode', v as PaymentMode)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_MODES.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </F>
+            <div className="col-span-2 grid grid-cols-2 gap-4">
+              <F label="Payment Mode">
+                <Select
+                  value={watch('paymentMode')}
+                  onValueChange={(v) => {
+                    const mode = v as PaymentMode;
+                    setValue('paymentMode', mode);
+                    if (mode === 'Cash') setValue('account', 'None');
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_MODES.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </F>
+              <F label="Account">
+                <Select
+                  value={watch('account')}
+                  onValueChange={(v) => setValue('account', v as PaymentAccount)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_ACCOUNTS.map((a) => (
+                      <SelectItem key={a} value={a}>
+                        {formatPaymentAccount(a)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </F>
+            </div>
             <F label="Purpose" className="col-span-2">
               <Input {...register('purpose')} />
             </F>

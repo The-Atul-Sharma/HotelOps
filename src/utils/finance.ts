@@ -459,6 +459,15 @@ export function expenseAccountBucket(expense: {
   return 'Cash';
 }
 
+export function advanceAccountBucket(advance: {
+  paymentMode: string;
+  account: PaymentAccount;
+}): AccountBalanceBucket {
+  if (advance.account === 'Hotel') return 'Hotel';
+  if (advance.account === 'Hulla') return 'Hulla';
+  return 'Cash';
+}
+
 export interface AccountBalanceRow {
   bucket: AccountBalanceBucket;
   label: string;
@@ -470,6 +479,7 @@ export interface AccountBalanceRow {
 export function computeAccountBalances(
   payments: Pick<BookingPayment, 'amount' | 'mode' | 'account'>[],
   expenses: Pick<Expense, 'amount' | 'paymentMode' | 'account'>[],
+  advances: Pick<Advance, 'amount' | 'paymentMode' | 'account'>[] = [],
 ): AccountBalanceRow[] {
   const totals: Record<AccountBalanceBucket, { income: number; expense: number }> = {
     Cash: { income: 0, expense: 0 },
@@ -485,6 +495,11 @@ export function computeAccountBalances(
   for (const expense of expenses) {
     const bucket = expenseAccountBucket(expense);
     totals[bucket].expense = round2(totals[bucket].expense + (Number(expense.amount) || 0));
+  }
+
+  for (const advance of advances) {
+    const bucket = advanceAccountBucket({ ...advance, account: advance.account ?? 'None' });
+    totals[bucket].expense = round2(totals[bucket].expense + (Number(advance.amount) || 0));
   }
 
   return ACCOUNT_BALANCE_BUCKETS.map((bucket) => ({

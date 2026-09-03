@@ -27,6 +27,7 @@ import {
   CategoryBarChart,
   PaymentMethodChart,
   OccupancyChart,
+  AccountBalanceChart,
   MonthlyProfitChart,
   PendingPaymentsChart,
 } from './charts';
@@ -91,6 +92,9 @@ export default function DashboardPage() {
         </ChartCard>
         <ChartCard title="Room Occupancy">
           <OccupancyChart data={data.occupancy} />
+        </ChartCard>
+        <ChartCard title="Account Balance">
+          <AccountBalanceChart data={data.accountBalanceChart} />
         </ChartCard>
         <ChartCard title="Outstanding / Pending Payments">
           <PendingPaymentsChart data={data.pendingChart} />

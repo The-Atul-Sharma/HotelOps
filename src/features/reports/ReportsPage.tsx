@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useExpenses, useBookings } from "@/hooks/useEntities";
+import { useExpenses, useBookings, useAdvances } from "@/hooks/useEntities";
 import { usePagination } from "@/hooks/usePagination";
 import { useDateRange } from "@/hooks/useDateRange";
 import { inRange } from "@/utils/dateRange";
@@ -36,7 +36,7 @@ import { exportToExcel } from "@/utils/excel";
 import { formatDate } from "@/utils/format";
 import { ACCOUNT_BALANCE_FROM, ACCOUNT_BALANCE_MESSAGE } from "@/config/constants";
 import { AccountBalanceChart } from "@/features/dashboard/charts";
-import type { Booking, BookingPayment, DateRange, Expense } from "@/types";
+import type { Advance, Booking, BookingPayment, DateRange, Expense } from "@/types";
 
 const REPORTS = [
   "Daily Collection",
@@ -72,6 +72,7 @@ function bookingPending(b: Booking) {
 export default function ReportsPage() {
   const { data: bookings = [], isLoading } = useBookings();
   const { data: expenses = [] } = useExpenses();
+  const { data: advances = [] } = useAdvances();
   const { range, resetKey, filterProps } = useDateRange("month");
   const [report, setReport] = useState<ReportType>("Daily Profit");
 
@@ -102,9 +103,10 @@ export default function ReportsPage() {
         bookings,
         scopedExpenses,
         expenses,
+        advances,
         range,
       ),
-    [report, paymentRows, incomeBookings, bookings, scopedExpenses, expenses, range],
+    [report, paymentRows, incomeBookings, bookings, scopedExpenses, expenses, advances, range],
   );
 
   const { page, setPage, pageItems, total: pageTotal } = usePagination(
@@ -156,7 +158,7 @@ export default function ReportsPage() {
 
       {report === "Account Balance" && (
         <p className="rounded-lg border bg-muted/50 px-4 py-2.5 text-sm text-muted-foreground">
-          {ACCOUNT_BALANCE_MESSAGE} · money received minus expenses per account
+          {ACCOUNT_BALANCE_MESSAGE} · money received minus expenses and advances per account
         </p>
       )}
 
@@ -275,6 +277,7 @@ function buildReport(
   bookings: Booking[],
   expenses: Expense[],
   allExpenses: Expense[],
+  allAdvances: Advance[],
   range: DateRange,
 ): {
   rows: Record<string, unknown>[];
@@ -573,7 +576,12 @@ function buildReport(
         }
       }
       const abExpenses = allExpenses.filter((e) => inRange(e.date, abRange));
-      const balances = computeAccountBalances(payments, abExpenses);
+      const abAdvances = allAdvances.filter((a) => inRange(a.date, abRange));
+      const balances = computeAccountBalances(
+        payments,
+        abExpenses,
+        abAdvances.map((a) => ({ ...a, account: a.account ?? "None" })),
+      );
       const rows = balances.map((b) => ({
         Account: b.label,
         Received: b.income,
@@ -594,7 +602,7 @@ function buildReport(
           tone: b.balance >= 0 ? "text-success" : "text-destructive",
         })),
         chartData: balances.map((b) => ({ name: b.label, value: b.balance })),
-        subtitle: `${ACCOUNT_BALANCE_MESSAGE} · money received minus expenses per account`,
+        subtitle: `${ACCOUNT_BALANCE_MESSAGE} · money received minus expenses and advances per account`,
       };
     }
     case "STF": {

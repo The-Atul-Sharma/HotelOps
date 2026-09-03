@@ -14,6 +14,8 @@ import {
   bookingRoomIncome,
   bookingTotalIncome,
   calculatePaymentStatus,
+  computeAccountBalances,
+  resolveBookingPayments,
   round2,
 } from '@/utils/finance';
 import type { Booking, BookingPayment, DateRange } from '@/types';
@@ -70,7 +72,11 @@ export function useDashboardData(range: DateRange) {
 
     const expensesInRange = expenses.filter((e) => inRange(e.date, range));
     const totalExpenses = round2(expensesInRange.reduce((s, e) => s + e.amount, 0));
-    const netProfit = round2(totalRevenue - totalExpenses);
+
+    const advancesInRange = advances.filter((a) => inRange(a.date, range));
+    const advancesGiven = round2(advancesInRange.reduce((s, a) => s + a.amount, 0));
+
+    const netProfit = round2(totalRevenue - totalExpenses - advancesGiven);
 
     const pendingBookings = activeBookings.filter(
       (b) => bookingPending(b) > 0 && inRange(b.checkInDate, range),
@@ -80,9 +86,6 @@ export function useDashboardData(range: DateRange) {
       (b) => calculatePaymentStatus(b.totalAmount, b.paidAmount, b.checkOutDate) === 'OVERDUE',
     );
     const overdueAmount = round2(overdueBookings.reduce((s, b) => s + bookingPending(b), 0));
-
-    const advancesInRange = advances.filter((a) => inRange(a.date, range));
-    const advancesGiven = round2(advancesInRange.reduce((s, a) => s + a.amount, 0));
 
     const todayCollection = round2(
       activeBookings.reduce((sum, b) => {
@@ -147,6 +150,14 @@ export function useDashboardData(range: DateRange) {
       entry.sort = sort;
       byDay.set(label, entry);
     }
+    for (const a of advancesInRange) {
+      const sort = dayjs(a.date).format('YYYY-MM-DD');
+      const label = dayjs(a.date).format('DD MMM');
+      const entry = byDay.get(label) ?? { sort, revenue: 0, expense: 0 };
+      entry.expense += a.amount;
+      entry.sort = sort;
+      byDay.set(label, entry);
+    }
     const revenueExpense = Array.from(byDay.entries())
       .sort((a, b) => a[1].sort.localeCompare(b[1].sort))
       .map(([label, v]) => ({
@@ -195,6 +206,14 @@ export function useDashboardData(range: DateRange) {
       entry.sort = sort;
       monthMap.set(label, entry);
     }
+    for (const a of advancesInRange) {
+      const sort = dayjs(a.date).format('YYYY-MM');
+      const label = dayjs(a.date).format('MMM YY');
+      const entry = monthMap.get(label) ?? { sort, income: 0, expense: 0 };
+      entry.expense += a.amount;
+      entry.sort = sort;
+      monthMap.set(label, entry);
+    }
     const monthlyProfit = Array.from(monthMap.entries())
       .sort((a, b) => a[1].sort.localeCompare(b[1].sort))
       .map(([label, v]) => ({
@@ -213,6 +232,24 @@ export function useDashboardData(range: DateRange) {
       .sort((a, b) => b.pending - a.pending)
       .slice(0, 6);
 
+    const paymentsForBalance: BookingPayment[] = [];
+    for (const b of activeBookings) {
+      for (const payment of resolveBookingPayments(b)) {
+        if (inRange(payment.date, range)) {
+          paymentsForBalance.push(payment);
+        }
+      }
+    }
+    const accountBalances = computeAccountBalances(
+      paymentsForBalance,
+      expensesInRange,
+      advancesInRange.map((a) => ({ ...a, account: a.account ?? 'None' })),
+    );
+    const accountBalanceChart = accountBalances.map((b) => ({
+      name: b.label,
+      value: b.balance,
+    }));
+
     return {
       isLoading: rLoad || bLoad || eLoad || aLoad,
       kpis,
@@ -222,6 +259,8 @@ export function useDashboardData(range: DateRange) {
       occupancy,
       monthlyProfit,
       pendingChart,
+      accountBalances,
+      accountBalanceChart,
       overdueCount: overdueBookings.length,
       overdueAmount,
       todayBookings: todayCheckIns,

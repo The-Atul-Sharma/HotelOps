@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { isRouteErrorResponse, useRouteError } from 'react-router-dom';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import { isChunkLoadError } from '@/lib/chunkLoadError';
 export function RouteErrorBoundary() {
   const error = useRouteError();
   const chunkError = isChunkLoadError(error);
+  const [refreshing, setRefreshing] = useState(false);
 
   let message = 'Something went wrong loading this page.';
   if (isRouteErrorResponse(error)) {
@@ -29,9 +31,16 @@ export function RouteErrorBoundary() {
             : message}
         </p>
       </div>
-      <Button onClick={() => window.location.reload()}>
-        <RefreshCw className="h-4 w-4" />
-        Refresh app
+      <Button
+        disabled={refreshing}
+        onClick={() => {
+          if (refreshing) return;
+          setRefreshing(true);
+          window.location.reload();
+        }}
+      >
+        <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+        {refreshing ? 'Refreshing...' : 'Refresh app'}
       </Button>
     </div>
   );

@@ -86,6 +86,14 @@ function ensureCollections(db: Database): boolean {
   if (!Array.isArray(db.advances)) {
     db.advances = MOCK_ADVANCES.map((a) => ({ ...a }));
     changed = true;
+  } else {
+    let migrated = false;
+    db.advances = db.advances.map((a) => {
+      if (a.account != null) return a;
+      migrated = true;
+      return { ...a, account: 'None' as const };
+    });
+    if (migrated) changed = true;
   }
   if (!Array.isArray(db.rooms)) {
     db.rooms = MOCK_ROOMS.map((r) => ({ ...r }));
