@@ -11,9 +11,11 @@ import { router } from '@/router';
 import { bootstrapDataLayer } from '@/services/api';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { clearChunkReloadFlag, isChunkLoadError, reloadForStaleChunk } from '@/lib/chunkLoadError';
+import { cleanPwaReloadParam } from '@/lib/pwaUpdate';
 import './index.css';
 
 clearChunkReloadFlag();
+cleanPwaReloadParam();
 
 window.addEventListener('unhandledrejection', (event) => {
   if (isChunkLoadError(event.reason)) {

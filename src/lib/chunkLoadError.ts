@@ -15,7 +15,10 @@ const CHUNK_RELOAD_KEY = 'chunk-reload';
 export function reloadForStaleChunk(): boolean {
   if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return false;
   sessionStorage.setItem(CHUNK_RELOAD_KEY, 'true');
-  window.location.reload();
+  const url = new URL(window.location.href);
+  url.searchParams.delete('_sw');
+  url.searchParams.set('_sw', String(Date.now()));
+  window.location.replace(url.toString());
   return true;
 }
 

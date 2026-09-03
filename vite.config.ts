@@ -59,6 +59,13 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,svg,png,woff2}'],
         navigateFallback: '/index.html',
         cleanupOutdatedCaches: true,
+        navigationPreload: true,
+        runtimeCaching: [
+          {
+            urlPattern: /\/version\.json$/,
+            handler: 'NetworkOnly',
+          },
+        ],
       },
     }),
     {

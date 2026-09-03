@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { router } from '@/router';
+import {
+  cacheBustReload,
+  clearPwaUpdateReload,
+  isRecentPwaUpdateReload,
+  markPwaUpdateReload,
+  recoverStalePwaAfterFailedUpdate,
+} from '@/lib/pwaUpdate';
 
 function hasWaitingWorker(registration?: ServiceWorkerRegistration) {
   return Boolean(registration?.waiting && navigator.serviceWorker.controller);
@@ -11,6 +18,34 @@ async function fetchDeployedVersion() {
   if (!response.ok) return null;
   const data = (await response.json()) as { version?: string };
   return data.version ?? null;
+}
+
+async function waitForWaitingWorker(reg: ServiceWorkerRegistration, timeoutMs = 4000) {
+  if (hasWaitingWorker(reg)) return true;
+
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      reg.removeEventListener('updatefound', onUpdateFound);
+      window.clearTimeout(timeout);
+      resolve(value);
+    };
+
+    const onUpdateFound = () => {
+      const installing = reg.installing;
+      if (!installing) return;
+
+      installing.addEventListener('statechange', () => {
+        if (installing.state === 'installed') finish(hasWaitingWorker(reg));
+      });
+    };
+
+    reg.addEventListener('updatefound', onUpdateFound);
+    const timeout = window.setTimeout(() => finish(hasWaitingWorker(reg)), timeoutMs);
+  });
 }
 
 export function useAppUpdate() {
@@ -35,6 +70,11 @@ export function useAppUpdate() {
     setUpdateAvailable(true);
   }, [setSwNeedRefresh]);
 
+  const clearUpdateAvailable = useCallback(() => {
+    setSwNeedRefresh(false);
+    setUpdateAvailable(false);
+  }, [setSwNeedRefresh]);
+
   const syncWaitingWorker = useCallback(
     (reg = registration) => {
       if (hasWaitingWorker(reg)) markUpdateAvailable();
@@ -46,42 +86,87 @@ export function useAppUpdate() {
     const reg = registration ?? (await navigator.serviceWorker.getRegistration()) ?? undefined;
     if (reg && !registration) setRegistration(reg);
 
-    syncWaitingWorker(reg);
-
+    let deployedVersion: string | null = null;
     try {
-      const deployedVersion = await fetchDeployedVersion();
-      if (deployedVersion && deployedVersion !== __BUILD_ID__) {
-        markUpdateAvailable();
-        if (reg && !reg.waiting) {
-          await reg.update();
-          syncWaitingWorker(reg);
-        }
-        return;
-      }
+      deployedVersion = await fetchDeployedVersion();
     } catch {
       return;
     }
 
-    if (!reg || reg.installing || reg.waiting) return;
-    await reg.update();
+    if (deployedVersion && deployedVersion === __BUILD_ID__) {
+      clearPwaUpdateReload();
+      clearUpdateAvailable();
+      return;
+    }
+
+    if (deployedVersion && deployedVersion !== __BUILD_ID__) {
+      if (isRecentPwaUpdateReload()) {
+        await recoverStalePwaAfterFailedUpdate();
+        return;
+      }
+
+      if (reg && !reg.waiting && !reg.installing) {
+        try {
+          await reg.update();
+        } catch {
+          return;
+        }
+      }
+
+      if (reg && (reg.installing || (!reg.waiting && !reg.installing))) {
+        await waitForWaitingWorker(reg);
+      }
+
+      if (hasWaitingWorker(reg) || !reg?.installing) {
+        markUpdateAvailable();
+      }
+      return;
+    }
+
     syncWaitingWorker(reg);
-  }, [markUpdateAvailable, registration, syncWaitingWorker]);
+
+    if (!reg || reg.installing || reg.waiting) return;
+
+    try {
+      await reg.update();
+    } catch {
+      return;
+    }
+
+    syncWaitingWorker(reg);
+  }, [
+    clearUpdateAvailable,
+    markUpdateAvailable,
+    registration,
+    syncWaitingWorker,
+  ]);
 
   const applyUpdate = useCallback(async () => {
-    const reload = () => window.location.reload();
+    markPwaUpdateReload();
 
-    navigator.serviceWorker.addEventListener('controllerchange', reload, { once: true });
+    let reloaded = false;
+    const doReload = () => {
+      if (reloaded) return;
+      reloaded = true;
+      cacheBustReload();
+    };
+
+    navigator.serviceWorker.addEventListener('controllerchange', doReload, { once: true });
 
     const reg = registration ?? (await navigator.serviceWorker.getRegistration()) ?? undefined;
 
     if (reg?.waiting) {
       await updateServiceWorker(true);
-      window.setTimeout(reload, 1500);
-      return;
+    } else if (reg) {
+      try {
+        await reg.update();
+      } catch {
+        doReload();
+        return;
+      }
     }
 
-    if (reg) await reg.update();
-    reload();
+    window.setTimeout(doReload, 1500);
   }, [registration, updateServiceWorker]);
 
   useEffect(() => {

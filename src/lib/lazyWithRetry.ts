@@ -9,8 +9,8 @@ export function lazyWithRetry<T extends ComponentType<unknown>>(
       const module = await importFn();
       return module;
     } catch (error) {
-      if (isChunkLoadError(error) && reloadForStaleChunk()) {
-        return new Promise(() => {});
+      if (isChunkLoadError(error)) {
+        reloadForStaleChunk();
       }
       throw error;
     }

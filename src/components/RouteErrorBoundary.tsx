@@ -3,6 +3,7 @@ import { isRouteErrorResponse, useRouteError } from 'react-router-dom';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { isChunkLoadError } from '@/lib/chunkLoadError';
+import { forcePwaRefresh } from '@/lib/pwaUpdate';
 
 export function RouteErrorBoundary() {
   const error = useRouteError();
@@ -36,6 +37,10 @@ export function RouteErrorBoundary() {
         onClick={() => {
           if (refreshing) return;
           setRefreshing(true);
+          if (chunkError) {
+            void forcePwaRefresh();
+            return;
+          }
           window.location.reload();
         }}
       >
