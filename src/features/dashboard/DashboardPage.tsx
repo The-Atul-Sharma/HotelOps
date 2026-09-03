@@ -33,11 +33,13 @@ import {
 } from './charts';
 import { useDashboardData } from './useDashboardData';
 import { useDateRange } from '@/hooks/useDateRange';
+import { formatRangePeriodLabel } from '@/utils/dateRange';
 import { formatINR } from '@/utils/format';
 
 export default function DashboardPage() {
-  const { range, filterProps } = useDateRange('month');
+  const { range, preset, filterProps } = useDateRange('month');
   const data = useDashboardData(range);
+  const periodLabel = formatRangePeriodLabel(preset, range);
 
   if (data.isLoading) return <LoadingState label="Loading dashboard…" />;
 
@@ -47,7 +49,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description="Live overview of booking revenue, collections, expenses and occupancy."
+        description={`${periodLabel} · Live overview of booking revenue, collections, expenses and occupancy.`}
         actions={<DateRangeFilter {...filterProps} />}
       />
 

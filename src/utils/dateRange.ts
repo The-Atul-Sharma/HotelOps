@@ -40,3 +40,32 @@ export function inRange(date: string, range: DateRange): boolean {
     (d.isBefore(dayjs(range.to).endOf('day')) || d.isSame(dayjs(range.to), 'day'))
   );
 }
+
+export function formatRangePeriodLabel(preset: RangePreset, range: DateRange): string {
+  switch (preset) {
+    case 'today':
+      return dayjs(range.from).format('D MMMM YYYY');
+    case 'week': {
+      const from = dayjs(range.from);
+      const to = dayjs(range.to);
+      if (from.isSame(to, 'year')) {
+        return `${from.format('D MMM')} – ${to.format('D MMM YYYY')}`;
+      }
+      return `${from.format('D MMM YYYY')} – ${to.format('D MMM YYYY')}`;
+    }
+    case 'month':
+    case 'lastMonth':
+      return dayjs(range.from).format('MMMM YYYY');
+    case 'all':
+      return 'All Time';
+    case 'custom': {
+      const from = dayjs(range.from);
+      const to = dayjs(range.to);
+      if (from.isSame(to, 'day')) return from.format('D MMMM YYYY');
+      if (from.isSame(to, 'year')) {
+        return `${from.format('D MMM')} – ${to.format('D MMM YYYY')}`;
+      }
+      return `${from.format('D MMM YYYY')} – ${to.format('D MMM YYYY')}`;
+    }
+  }
+}
