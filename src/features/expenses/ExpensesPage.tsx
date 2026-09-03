@@ -5,6 +5,8 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { Pencil, Plus, Search, Trash2, TrendingDown } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { ExportPrintActions } from "@/components/shared/ExportPrintActions";
+import { PrintableTable } from "@/components/shared/PrintableTable";
 import { LoadingState, EmptyState } from "@/components/shared/states";
 import { Money } from "@/components/shared/Money";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
@@ -41,7 +43,6 @@ import { useDateRange } from "@/hooks/useDateRange";
 import { DateRangeFilter } from "@/components/shared/DateRangeFilter";
 import { PaginationBar } from "@/components/shared/Pagination";
 import { EXPENSE_CATEGORIES, PAYMENT_ACCOUNTS, PAYMENT_MODES, formatPaymentAccount } from "@/config/constants";
-import { exportToExcel } from "@/utils/excel";
 import { formatDate, formatINR } from "@/utils/format";
 import { inRange } from "@/utils/dateRange";
 import dayjs from "dayjs";
@@ -230,6 +231,32 @@ export default function ExpensesPage() {
     remove.mutate(e.id, { onSuccess: () => toast.success("Expense deleted") });
   };
 
+  const exportRows = useMemo(
+    () =>
+      filtered.map((e) => ({
+        Date: formatDate(e.date),
+        Category: e.category,
+        "Expense name": e.category === "Other" ? e.description : "—",
+        "Person name": e.category === "STF" ? e.description : "—",
+        Mode: e.paymentMode,
+        Account: formatPaymentAccount(e.account),
+        Remark: e.remarks || "—",
+        Amount: formatINR(e.amount),
+      })),
+    [filtered],
+  );
+
+  const exportColumns = [
+    { key: "Date", label: "Date" },
+    { key: "Category", label: "Category" },
+    { key: "Expense name", label: "Expense name" },
+    { key: "Person name", label: "Person name" },
+    { key: "Mode", label: "Mode" },
+    { key: "Account", label: "Account" },
+    { key: "Remark", label: "Remark" },
+    { key: "Amount", label: "Amount", align: "right" as const },
+  ];
+
   if (isLoading) return <LoadingState />;
 
   return (
@@ -240,18 +267,7 @@ export default function ExpensesPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <DateRangeFilter {...filterProps} />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                exportToExcel(
-                  filtered as unknown as Record<string, unknown>[],
-                  "expenses",
-                )
-              }
-            >
-              Export
-            </Button>
+            <ExportPrintActions rows={exportRows} filename="expenses" />
             <Button onClick={openAdd} className="gap-1.5">
               <Plus className="h-4 w-4" /> Add Expense
             </Button>
@@ -259,7 +275,7 @@ export default function ExpensesPage() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2">
+      <div className="no-print grid grid-cols-2 gap-3 sm:grid-cols-2">
         <Card className="p-4">
           <p className="text-xs text-muted-foreground">In Range (Today)</p>
           <p className="mt-1 text-xl font-semibold">
@@ -276,7 +292,7 @@ export default function ExpensesPage() {
         </Card>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="no-print flex flex-wrap items-center gap-2">
         <div className="relative min-w-[200px] flex-1">
           <Search className="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -313,7 +329,8 @@ export default function ExpensesPage() {
         />
       ) : (
         <>
-          <div className="overflow-x-auto rounded-lg border bg-card">
+          <PrintableTable title="Expenses" columns={exportColumns} rows={exportRows} />
+          <div className="no-print overflow-x-auto rounded-lg border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -325,7 +342,7 @@ export default function ExpensesPage() {
                   <TableHead>Account</TableHead>
                   <TableHead>Remark</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="no-print text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -349,7 +366,7 @@ export default function ExpensesPage() {
                     <TableCell className="text-right font-medium">
                       <Money value={e.amount} />
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="no-print text-right">
                       <div className="flex justify-end gap-1">
                         <Button
                           size="icon"
@@ -374,7 +391,9 @@ export default function ExpensesPage() {
               </TableBody>
             </Table>
           </div>
-          <PaginationBar page={page} total={pageTotal} onPageChange={setPage} />
+          <div className="no-print">
+            <PaginationBar page={page} total={pageTotal} onPageChange={setPage} />
+          </div>
         </>
       )}
 

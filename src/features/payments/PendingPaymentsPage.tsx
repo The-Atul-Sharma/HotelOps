@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Clock, Eye } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { ExportPrintActions } from '@/components/shared/ExportPrintActions';
+import { PrintableTable } from '@/components/shared/PrintableTable';
 import { LoadingState, EmptyState } from '@/components/shared/states';
 import { PaymentStatusBadge } from '@/components/shared/StatusBadge';
 import { DateRangeFilter } from '@/components/shared/DateRangeFilter';
@@ -21,7 +23,7 @@ import { useBookings } from '@/hooks/useEntities';
 import { usePagination } from '@/hooks/usePagination';
 import { useDateRange } from '@/hooks/useDateRange';
 import { calculatePaymentStatus, bookingPendingAmount, bookingPendingBreakdown, round2 } from '@/utils/finance';
-import { formatDate } from '@/utils/format';
+import { formatDate, formatINR } from '@/utils/format';
 import { inRange } from '@/utils/dateRange';
 import { cn } from '@/lib/utils';
 import type { Booking, PaymentStatus } from '@/types';
@@ -68,6 +70,37 @@ export default function PendingPaymentsPage() {
   const overdue = allWithBalance.filter((b) => bookingStatus(b) === 'OVERDUE');
   const overdueAmount = round2(overdue.reduce((s, b) => s + bookingPending(b), 0));
 
+  const exportRows = useMemo(
+    () =>
+      pending.map(({ booking: b, status, pending: due }) => {
+        const breakdown = bookingPendingBreakdown(b);
+        return {
+          'Check-in': formatDate(b.checkInDate),
+          Guest: b.guestName,
+          Room: b.roomNumber,
+          Stay: `${formatDate(b.checkInDate, 'DD MMM')} → ${formatDate(b.checkOutDate, 'DD MMM')}`,
+          Total: formatINR(breakdown.grandTotal),
+          Paid: formatINR(breakdown.paid),
+          'Extras Due': formatINR(breakdown.extrasPending),
+          Pending: formatINR(due),
+          Status: status,
+        };
+      }),
+    [pending],
+  );
+
+  const exportColumns = [
+    { key: 'Check-in', label: 'Check-in' },
+    { key: 'Guest', label: 'Guest' },
+    { key: 'Room', label: 'Room' },
+    { key: 'Stay', label: 'Stay' },
+    { key: 'Total', label: 'Total', align: 'right' as const },
+    { key: 'Paid', label: 'Paid', align: 'right' as const },
+    { key: 'Extras Due', label: 'Extras Due', align: 'right' as const },
+    { key: 'Pending', label: 'Pending', align: 'right' as const },
+    { key: 'Status', label: 'Status' },
+  ];
+
   if (isLoading) return <LoadingState />;
 
   return (
@@ -89,11 +122,12 @@ export default function PendingPaymentsPage() {
                 <SelectItem value="OVERDUE">Overdue</SelectItem>
               </SelectContent>
             </Select>
+            <ExportPrintActions rows={exportRows} filename="pending-payments" />
           </div>
         }
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="no-print grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Card className="p-4">
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Clock className="h-3.5 w-3.5" /> Total Pending
@@ -120,7 +154,8 @@ export default function PendingPaymentsPage() {
         <EmptyState title="No pending payments from bookings" />
       ) : (
         <>
-          <div className="overflow-x-auto rounded-lg border bg-card">
+          <PrintableTable title="Pending Payments" columns={exportColumns} rows={exportRows} />
+          <div className="no-print overflow-x-auto rounded-lg border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -133,7 +168,7 @@ export default function PendingPaymentsPage() {
                   <TableHead className="text-right">Extras Due</TableHead>
                   <TableHead className="text-right">Pending</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
+                  <TableHead className="no-print text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -172,7 +207,7 @@ export default function PendingPaymentsPage() {
                     <TableCell>
                       <PaymentStatusBadge status={status} />
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="no-print text-right">
                       <Button asChild size="icon" variant="ghost" className="h-8 w-8">
                         <Link to={`/bookings/${b.id}`}>
                           <Eye className="h-4 w-4" />
@@ -185,7 +220,9 @@ export default function PendingPaymentsPage() {
               </TableBody>
             </Table>
           </div>
-          <PaginationBar page={page} total={pageTotal} onPageChange={setPage} />
+          <div className="no-print">
+            <PaginationBar page={page} total={pageTotal} onPageChange={setPage} />
+          </div>
         </>
       )}
     </div>

@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import { Plus, HandCoins, Pencil, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { ExportPrintActions } from '@/components/shared/ExportPrintActions';
+import { PrintableTable } from '@/components/shared/PrintableTable';
 import { LoadingState, EmptyState } from '@/components/shared/states';
 import { Money } from '@/components/shared/Money';
 import { useConfirm } from '@/components/shared/ConfirmDialog';
@@ -165,6 +167,30 @@ export default function AdvancesPage() {
     remove.mutate(a.id, { onSuccess: () => toast.success('Advance deleted') });
   };
 
+  const exportRows = useMemo(
+    () =>
+      filtered.map((a) => ({
+        Date: formatDate(a.date),
+        Person: a.person,
+        Type: a.type,
+        Purpose: a.purpose || '—',
+        'Payment Mode': a.paymentMode ?? '—',
+        Account: formatPaymentAccount(a.account),
+        Amount: formatINR(a.amount),
+      })),
+    [filtered],
+  );
+
+  const exportColumns = [
+    { key: 'Date', label: 'Date' },
+    { key: 'Person', label: 'Person' },
+    { key: 'Type', label: 'Type' },
+    { key: 'Purpose', label: 'Purpose' },
+    { key: 'Payment Mode', label: 'Payment Mode' },
+    { key: 'Account', label: 'Account' },
+    { key: 'Amount', label: 'Amount', align: 'right' as const },
+  ];
+
   if (isLoading) return <LoadingState />;
 
   return (
@@ -175,6 +201,7 @@ export default function AdvancesPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <DateRangeFilter {...filterProps} />
+            <ExportPrintActions rows={exportRows} filename="advances" />
             <Button onClick={openAdd} className="gap-1.5">
               <Plus className="h-4 w-4" /> Add Advance
             </Button>
@@ -182,7 +209,7 @@ export default function AdvancesPage() {
         }
       />
 
-      <Card className="p-4 sm:max-w-xs">
+      <Card className="no-print p-4 sm:max-w-xs">
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <HandCoins className="h-3.5 w-3.5" /> Total Advances
         </p>
@@ -195,7 +222,8 @@ export default function AdvancesPage() {
         <EmptyState title="No advances in this range" />
       ) : (
         <>
-          <div className="overflow-x-auto rounded-lg border bg-card">
+          <PrintableTable title="Advances" columns={exportColumns} rows={exportRows} />
+          <div className="no-print overflow-x-auto rounded-lg border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -206,7 +234,7 @@ export default function AdvancesPage() {
                   <TableHead>Payment Mode</TableHead>
                   <TableHead>Account</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="no-print text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -221,7 +249,7 @@ export default function AdvancesPage() {
                     <TableCell className="text-right">
                       <Money value={a.amount} />
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="no-print text-right">
                       <div className="flex justify-end gap-1">
                         <Button
                           size="icon"
@@ -246,7 +274,9 @@ export default function AdvancesPage() {
               </TableBody>
             </Table>
           </div>
-          <PaginationBar page={page} total={pageTotal} onPageChange={setPage} />
+          <div className="no-print">
+            <PaginationBar page={page} total={pageTotal} onPageChange={setPage} />
+          </div>
         </>
       )}
 

@@ -49,9 +49,7 @@ export const Invoice = forwardRef<HTMLDivElement, { booking: Booking; settings: 
             {booking.email && <p>{booking.email}</p>}
           </div>
           <div className="text-right">
-            <p>
-              Room: {booking.roomNumber} ({booking.roomType})
-            </p>
+            <p>Room: {booking.roomNumber}</p>
             <p>Check-in: {formatDate(booking.checkInDate)}</p>
             <p>Check-out: {formatDate(booking.checkOutDate)}</p>
             <p>Guests: {booking.adults + booking.children}</p>

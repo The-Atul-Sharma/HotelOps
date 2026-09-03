@@ -13,7 +13,7 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <div className={cn('flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between', className)}>
+    <div className={cn('no-print flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between', className)}>
       <div>
         <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
         {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}

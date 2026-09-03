@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Eye, Pencil, LogOut } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { ExportPrintActions } from '@/components/shared/ExportPrintActions';
+import { PrintableTable } from '@/components/shared/PrintableTable';
 import { LoadingState, EmptyState } from '@/components/shared/states';
 import { BookingStatusBadge, PaymentStatusBadge } from '@/components/shared/StatusBadge';
 import { Money } from '@/components/shared/Money';
@@ -23,7 +25,7 @@ import { DateRangeFilter } from '@/components/shared/DateRangeFilter';
 import { BookingFormDialog } from './BookingFormDialog';
 import { BookingCheckoutDialog } from './BookingCheckoutDialog';
 import { bookingPendingAmount, bookingPendingBreakdown, calculatePaymentStatus, sumExtraCharges } from '@/utils/finance';
-import { formatDate } from '@/utils/format';
+import { formatDate, formatINR } from '@/utils/format';
 import { inRange } from '@/utils/dateRange';
 import { useDateRange } from '@/hooks/useDateRange';
 import type { Booking, BookingStatus } from '@/types';
@@ -67,6 +69,39 @@ export default function BookingsPage() {
     setCheckoutBooking(booking);
   };
 
+  const exportRows = useMemo(
+    () =>
+      filtered.map((b) => {
+        const breakdown = bookingPendingBreakdown(b);
+        return {
+          Guest: b.guestName,
+          Mobile: b.mobile && b.mobile !== '—' ? b.mobile : '—',
+          Guests: b.adults + b.children,
+          Room: b.roomNumber,
+          Stay: `${formatDate(b.checkInDate, 'DD MMM')} → ${formatDate(b.checkOutDate, 'DD MMM')} (${b.nights}n)`,
+          Extras: formatINR(sumExtraCharges(b.extraCharges)),
+          Total: formatINR(b.totalAmount),
+          Balance: formatINR(bookingPendingAmount(b)),
+          Payment: calculatePaymentStatus(breakdown.grandTotal, breakdown.paid, b.checkOutDate),
+          Status: b.status,
+        };
+      }),
+    [filtered],
+  );
+
+  const exportColumns = [
+    { key: 'Guest', label: 'Guest' },
+    { key: 'Mobile', label: 'Mobile' },
+    { key: 'Guests', label: 'Guests' },
+    { key: 'Room', label: 'Room' },
+    { key: 'Stay', label: 'Stay' },
+    { key: 'Extras', label: 'Extras', align: 'right' as const },
+    { key: 'Total', label: 'Total', align: 'right' as const },
+    { key: 'Balance', label: 'Balance', align: 'right' as const },
+    { key: 'Payment', label: 'Payment' },
+    { key: 'Status', label: 'Status' },
+  ];
+
   if (isLoading) return <LoadingState label="Loading bookings…" />;
 
   return (
@@ -75,19 +110,22 @@ export default function BookingsPage() {
         title="Bookings"
         description="Create bookings and check guests out from this list."
         actions={
-          <Button
-            onClick={() => {
-              setEditBooking(undefined);
-              setFormOpen(true);
-            }}
-            className="gap-1.5"
-          >
-            <Plus className="h-4 w-4" /> New Booking
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <ExportPrintActions rows={exportRows} filename="bookings" />
+            <Button
+              onClick={() => {
+                setEditBooking(undefined);
+                setFormOpen(true);
+              }}
+              className="gap-1.5"
+            >
+              <Plus className="h-4 w-4" /> New Booking
+            </Button>
+          </div>
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="no-print flex flex-wrap items-center gap-2">
         <div className="relative min-w-[200px] flex-1">
           <Search className="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -120,7 +158,8 @@ export default function BookingsPage() {
         />
       ) : (
         <>
-          <div className="overflow-x-auto rounded-lg border bg-card">
+          <PrintableTable title="Bookings" columns={exportColumns} rows={exportRows} />
+          <div className="no-print overflow-x-auto rounded-lg border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -133,7 +172,7 @@ export default function BookingsPage() {
                   <TableHead className="text-right">Balance</TableHead>
                   <TableHead>Payment</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="no-print text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -172,7 +211,7 @@ export default function BookingsPage() {
                     <TableCell>
                       <BookingStatusBadge status={b.status} />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="no-print">
                       <div className="flex justify-end gap-1">
                         {(b.status === 'Checked In' || b.status === 'Reserved') && (
                           <Button
@@ -207,7 +246,9 @@ export default function BookingsPage() {
               </TableBody>
             </Table>
           </div>
-          <PaginationBar page={page} total={total} onPageChange={setPage} />
+          <div className="no-print">
+            <PaginationBar page={page} total={total} onPageChange={setPage} />
+          </div>
         </>
       )}
 

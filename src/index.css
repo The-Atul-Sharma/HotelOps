@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 @plugin 'tailwindcss-animate';
 
 @custom-variant dark (&:is(.dark *));
@@ -123,7 +123,10 @@
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-feature-settings: 'rlig' 1, 'calt' 1, 'tnum' 1;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1,
+    "tnum" 1;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -151,28 +154,110 @@ body {
   display: none;
 }
 
+.print-only {
+  display: none;
+}
+
 @media print {
   @page {
-    margin: 0;
+    size: A4;
+    margin: 12mm;
   }
 
   html,
-  body {
+  body,
+  #root,
+  #root > *,
+  .app-shell,
+  .app-main {
     background: white !important;
     height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    color: black !important;
+  }
+
+  aside,
+  header,
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+    overflow: visible !important;
+    max-width: 100% !important;
+  }
+
+  main {
     overflow: visible !important;
   }
 
-  body * {
+  main > div {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .print-table-wrap {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: visible !important;
+    border-right: 1px solid rgb(0 0 0 / 0.2) !important;
+  }
+
+  .print-table {
+    width: 100%;
+    max-width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    box-sizing: border-box;
+  }
+
+  .print-table thead {
+    display: table-header-group;
+  }
+
+  .print-table tbody {
+    display: table-row-group;
+  }
+
+  .print-table-cell {
+    border: 1px solid rgb(0 0 0 / 0.2);
+    padding: 0.25rem 0.35rem;
+    font-size: 10px;
+    line-height: 1.35;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-table th:last-child,
+  .print-table td:last-child {
+    border-right: 1px solid rgb(0 0 0 / 0.2) !important;
+    box-shadow: inset -1px 0 0 rgb(0 0 0 / 0.2) !important;
+  }
+
+  .print-only table {
+    page-break-inside: auto;
+  }
+
+  .print-only tr {
+    page-break-inside: avoid;
+  }
+
+  body.invoice-print * {
     visibility: hidden !important;
   }
 
-  #invoice-print-root,
-  #invoice-print-root * {
+  body.invoice-print #invoice-print-root,
+  body.invoice-print #invoice-print-root * {
     visibility: visible !important;
   }
 
-  #invoice-print-root {
+  body.invoice-print #invoice-print-root {
     display: block !important;
     position: absolute !important;
     left: 0 !important;

@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { Printer, FileSpreadsheet } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { ExportPrintActions } from "@/components/shared/ExportPrintActions";
+import { PrintableTable } from "@/components/shared/PrintableTable";
 import { LoadingState } from "@/components/shared/states";
 import { DateRangeFilter } from "@/components/shared/DateRangeFilter";
 import { PaginationBar } from "@/components/shared/Pagination";
 import { Money } from "@/components/shared/Money";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -32,8 +32,7 @@ import {
   resolveBookingPayments,
   round2,
 } from "@/utils/finance";
-import { exportToExcel } from "@/utils/excel";
-import { formatDate } from "@/utils/format";
+import { formatDate, formatINR } from "@/utils/format";
 import { ACCOUNT_BALANCE_FROM, ACCOUNT_BALANCE_MESSAGE } from "@/config/constants";
 import { AccountBalanceChart } from "@/features/dashboard/charts";
 import type { Advance, Booking, BookingPayment, DateRange, Expense } from "@/types";
@@ -114,6 +113,19 @@ export default function ReportsPage() {
     `${report}|${resetKey}`,
   );
 
+  const printRows = useMemo(
+    () =>
+      rows.map((row) => {
+        const out: Record<string, unknown> = {};
+        for (const c of columns) {
+          const v = row[c.key];
+          out[c.key] = c.money ? formatINR(Number(v) || 0) : String(v ?? "");
+        }
+        return out;
+      }),
+    [rows, columns],
+  );
+
   if (isLoading) return <LoadingState />;
 
   return (
@@ -124,27 +136,12 @@ export default function ReportsPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             {report !== "Account Balance" && <DateRangeFilter {...filterProps} />}
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => exportToExcel(rows, `${report}`)}
-            >
-              <FileSpreadsheet className="h-4 w-4" /> Excel
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => window.print()}
-            >
-              <Printer className="h-4 w-4" /> Print
-            </Button>
+            <ExportPrintActions rows={rows} filename={report} />
           </div>
         }
       />
 
-      <div className="flex flex-wrap gap-2">
+      <div className="no-print flex flex-wrap gap-2">
         {REPORTS.map((r) => (
           <button
             key={r}
@@ -157,14 +154,14 @@ export default function ReportsPage() {
       </div>
 
       {report === "Account Balance" && (
-        <p className="rounded-lg border bg-muted/50 px-4 py-2.5 text-sm text-muted-foreground">
+        <p className="no-print rounded-lg border bg-muted/50 px-4 py-2.5 text-sm text-muted-foreground">
           {ACCOUNT_BALANCE_MESSAGE} · money received minus expenses and advances per account
         </p>
       )}
 
       {summary.length > 0 && (
         <div
-          className={`grid gap-3 ${report === "Account Balance" ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}
+          className={`no-print grid gap-3 ${report === "Account Balance" ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}
         >
           {summary.map((s) => (
             <Card key={s.label} className="p-4">
@@ -177,7 +174,9 @@ export default function ReportsPage() {
         </div>
       )}
 
-      <Card>
+      <PrintableTable title={report} columns={columns} rows={printRows} />
+
+      <Card className="no-print">
         <CardHeader>
           <CardTitle className="text-base">{report}</CardTitle>
           {subtitle && (
@@ -186,7 +185,9 @@ export default function ReportsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {chartData && chartData.length > 0 && (
-            <AccountBalanceChart data={chartData} />
+            <div className="no-print">
+              <AccountBalanceChart data={chartData} />
+            </div>
           )}
           <div className="overflow-x-auto">
             <Table>
@@ -235,7 +236,9 @@ export default function ReportsPage() {
               </TableBody>
             </Table>
           </div>
-          <PaginationBar page={page} total={pageTotal} onPageChange={setPage} />
+          <div className="no-print">
+            <PaginationBar page={page} total={pageTotal} onPageChange={setPage} />
+          </div>
         </CardContent>
       </Card>
     </div>

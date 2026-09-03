@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Eye, Wallet } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { ExportPrintActions } from "@/components/shared/ExportPrintActions";
+import { PrintableTable } from "@/components/shared/PrintableTable";
 import { LoadingState, EmptyState } from "@/components/shared/states";
 import { DateRangeFilter } from "@/components/shared/DateRangeFilter";
 import { PaginationBar } from "@/components/shared/Pagination";
@@ -28,7 +30,7 @@ import { usePagination } from "@/hooks/usePagination";
 import { useDateRange } from "@/hooks/useDateRange";
 import { PAYMENT_MODES, formatPaymentAccount } from "@/config/constants";
 import { round2 } from "@/utils/finance";
-import { formatDate } from "@/utils/format";
+import { formatDate, formatINR } from "@/utils/format";
 import { inRange } from "@/utils/dateRange";
 import type { Booking, BookingPayment, PaymentMode } from "@/types";
 
@@ -94,6 +96,30 @@ export default function PaymentsPage() {
 
   const totalCollected = round2(rows.reduce((s, r) => s + r.payment.amount, 0));
 
+  const exportRows = useMemo(
+    () =>
+      rows.map(({ booking: b, payment: p }) => ({
+        Date: formatDate(p.date),
+        Guest: b.guestName,
+        Room: b.roomNumber,
+        Mode: p.mode,
+        Account: formatPaymentAccount(p.account),
+        Note: p.note || "—",
+        Amount: formatINR(p.amount),
+      })),
+    [rows],
+  );
+
+  const exportColumns = [
+    { key: "Date", label: "Date" },
+    { key: "Guest", label: "Guest" },
+    { key: "Room", label: "Room" },
+    { key: "Mode", label: "Mode" },
+    { key: "Account", label: "Account" },
+    { key: "Note", label: "Note" },
+    { key: "Amount", label: "Amount", align: "right" as const },
+  ];
+
   if (isLoading) return <LoadingState />;
 
   return (
@@ -120,11 +146,12 @@ export default function PaymentsPage() {
                 ))}
               </SelectContent>
             </Select>
+            <ExportPrintActions rows={exportRows} filename="payments" />
           </div>
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="no-print grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Card className="p-4">
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Wallet className="h-3.5 w-3.5" /> Total Collected
@@ -149,7 +176,8 @@ export default function PaymentsPage() {
         <EmptyState title="No payments in this range" />
       ) : (
         <>
-          <div className="overflow-x-auto rounded-lg border bg-card">
+          <PrintableTable title="Payments" columns={exportColumns} rows={exportRows} />
+          <div className="no-print overflow-x-auto rounded-lg border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -160,7 +188,7 @@ export default function PaymentsPage() {
                   <TableHead>Account</TableHead>
                   <TableHead>Note</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
+                  <TableHead className="no-print text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -179,7 +207,7 @@ export default function PaymentsPage() {
                     <TableCell className="text-right font-medium">
                       <Money value={p.amount} />
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="no-print text-right">
                       <Button asChild size="icon" variant="ghost" className="h-8 w-8">
                         <Link to={`/bookings/${b.id}`}>
                           <Eye className="h-4 w-4" />
@@ -191,7 +219,9 @@ export default function PaymentsPage() {
               </TableBody>
             </Table>
           </div>
-          <PaginationBar page={page} total={pageTotal} onPageChange={setPage} />
+          <div className="no-print">
+            <PaginationBar page={page} total={pageTotal} onPageChange={setPage} />
+          </div>
         </>
       )}
     </div>

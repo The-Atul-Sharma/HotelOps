@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Eye, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { ExportPrintActions } from "@/components/shared/ExportPrintActions";
+import { PrintableTable } from "@/components/shared/PrintableTable";
 import { LoadingState, EmptyState } from "@/components/shared/states";
 import { DateRangeFilter } from "@/components/shared/DateRangeFilter";
 import { PaginationBar } from "@/components/shared/Pagination";
@@ -20,7 +22,7 @@ import { useBookings } from "@/hooks/useEntities";
 import { usePagination } from "@/hooks/usePagination";
 import { useDateRange } from "@/hooks/useDateRange";
 import { round2, bookingRoomIncome, bookingExtrasIncome, bookingTotalIncome } from "@/utils/finance";
-import { formatDate } from "@/utils/format";
+import { formatDate, formatINR } from "@/utils/format";
 import { inRange } from "@/utils/dateRange";
 
 export default function IncomePage() {
@@ -55,6 +57,30 @@ export default function IncomePage() {
   const total = round2(roomTotal + extrasTotal);
   const collected = round2(rows.reduce((s, r) => s + r.booking.paidAmount, 0));
 
+  const exportRows = useMemo(
+    () =>
+      rows.map(({ booking: b, room, extras, total: rowTotal }) => ({
+        "Check-in": formatDate(b.checkInDate),
+        Guest: b.guestName,
+        Room: b.roomNumber,
+        "Room Tariff": formatINR(room),
+        Extras: formatINR(extras),
+        Total: formatINR(rowTotal),
+        Paid: formatINR(b.paidAmount),
+      })),
+    [rows],
+  );
+
+  const exportColumns = [
+    { key: "Check-in", label: "Check-in" },
+    { key: "Guest", label: "Guest" },
+    { key: "Room", label: "Room" },
+    { key: "Room Tariff", label: "Room Tariff", align: "right" as const },
+    { key: "Extras", label: "Extras", align: "right" as const },
+    { key: "Total", label: "Total", align: "right" as const },
+    { key: "Paid", label: "Paid", align: "right" as const },
+  ];
+
   if (isLoading) return <LoadingState />;
 
   return (
@@ -62,10 +88,15 @@ export default function IncomePage() {
       <PageHeader
         title="Income"
         description="Revenue from bookings — room tariff and extra charges."
-        actions={<DateRangeFilter {...filterProps} />}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <DateRangeFilter {...filterProps} />
+            <ExportPrintActions rows={exportRows} filename="income" />
+          </div>
+        }
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="no-print grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Card className="p-4">
           <p className="text-xs text-muted-foreground">Total Income</p>
           <p className="mt-1 flex items-center gap-1.5 text-xl font-semibold text-success">
@@ -97,7 +128,8 @@ export default function IncomePage() {
         <EmptyState title="No income in this range" />
       ) : (
         <>
-          <div className="overflow-x-auto rounded-lg border bg-card">
+          <PrintableTable title="Income" columns={exportColumns} rows={exportRows} />
+          <div className="no-print overflow-x-auto rounded-lg border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -108,7 +140,7 @@ export default function IncomePage() {
                   <TableHead className="text-right">Extras</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead className="text-right">Paid</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
+                  <TableHead className="no-print text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -131,7 +163,7 @@ export default function IncomePage() {
                     <TableCell className="text-right">
                       <Money value={b.paidAmount} />
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="no-print text-right">
                       <Button asChild size="icon" variant="ghost" className="h-8 w-8">
                         <Link to={`/bookings/${b.id}`}>
                           <Eye className="h-4 w-4" />
@@ -143,7 +175,9 @@ export default function IncomePage() {
               </TableBody>
             </Table>
           </div>
-          <PaginationBar page={page} total={pageTotal} onPageChange={setPage} />
+          <div className="no-print">
+            <PaginationBar page={page} total={pageTotal} onPageChange={setPage} />
+          </div>
         </>
       )}
     </div>

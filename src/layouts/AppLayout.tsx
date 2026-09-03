@@ -33,7 +33,7 @@ export function AppLayout() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="app-shell flex h-screen overflow-hidden bg-background">
       <aside className="hidden w-64 shrink-0 lg:block">
         <SidebarContent />
       </aside>
@@ -99,7 +99,7 @@ export function AppLayout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="app-main flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[1600px] p-3 sm:p-6">
             <Outlet />
           </div>

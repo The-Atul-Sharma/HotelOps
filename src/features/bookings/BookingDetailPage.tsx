@@ -54,6 +54,7 @@ import {
   round2,
 } from '@/utils/finance';
 import { formatDate, formatINR, formatRoomTariffLabel } from '@/utils/format';
+import { printInvoice } from '@/utils/print';
 import { BookingFormDialog } from './BookingFormDialog';
 import { BookingCheckoutDialog } from './BookingCheckoutDialog';
 import { buildSettledExtras } from './bookingCheckout';
@@ -412,14 +413,7 @@ export default function BookingDetailPage() {
 
   const handlePrint = () => {
     setInvoiceOpen(false);
-    const prevTitle = document.title;
-    document.title = ' ';
-    const restore = () => {
-      document.title = prevTitle;
-      window.removeEventListener('afterprint', restore);
-    };
-    window.addEventListener('afterprint', restore);
-    requestAnimationFrame(() => window.print());
+    printInvoice();
   };
 
   return (
