@@ -52,18 +52,17 @@ export default function DashboardPage() {
         actions={<DateRangeFilter {...filterProps} />}
       />
 
-      <div className="space-y-3">
-        <AttentionSection
-          pending={k.pending}
-          overdueCount={data.overdueCount}
-          overdueAmount={data.overdueAmount}
-          available={k.available}
-          reserved={k.reserved}
-          todayBookings={data.todayBookings}
-        />
+      <AttentionSection
+        pending={k.pending}
+        overdueCount={data.overdueCount}
+        overdueAmount={data.overdueAmount}
+        available={k.available}
+        reserved={k.reserved}
+        todayBookings={data.todayBookings}
+      />
 
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold">Finance</h2>
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold">Finance</h2>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           <KpiCard
             label="Net Profit"
@@ -108,8 +107,7 @@ export default function DashboardPage() {
             tone="warning"
           />
         </div>
-        </section>
-      </div>
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">Today & Occupancy</h2>
@@ -240,12 +238,12 @@ function AttentionSection({
   };
 
   return (
-    <Card className="px-4 py-3">
-      <div className="mb-2 flex items-center gap-2">
+    <Card className="p-4 gap-4">
+      <div className="flex items-center gap-2">
         <AlertTriangle className="h-4 w-4 text-warning" />
         <h2 className="text-sm font-semibold">Attention Required</h2>
       </div>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-2">
         {flags.map((f, i) => (
           <Link
             key={i}
