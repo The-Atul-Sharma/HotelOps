@@ -2,7 +2,7 @@ import { isSupabaseConfigured } from '@/lib/supabase';
 import { Repository, type Entity } from './repository';
 import { SupabaseRepository } from './supabaseRepository';
 import { getDb, persist, resetDb } from './db';
-import { getSessionUserId, getUserById } from './auth';
+import { getSessionUserId, getSessionUserName, getUserById } from './auth';
 import {
   ensureSupabaseSeed,
   getSupabaseSettings,
@@ -47,6 +47,8 @@ export const userService = repo<User>('users', 'u');
 export const auditRepo = repo<AuditLogEntry>('audit', 'al');
 
 export function getAuditActorName(): string {
+  const cachedName = getSessionUserName();
+  if (cachedName) return cachedName;
   const id = getSessionUserId();
   if (id) {
     const user = getUserById(id);

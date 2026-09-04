@@ -5,6 +5,7 @@ import { getDb } from './db';
 import type { User } from '@/types';
 
 const SESSION_KEY = `${STORAGE_PREFIX}:session`;
+const SESSION_NAME_KEY = `${STORAGE_PREFIX}:session-name`;
 
 export function getSessionUserId(): string | null {
   try {
@@ -14,12 +15,24 @@ export function getSessionUserId(): string | null {
   }
 }
 
-export function setSessionUserId(userId: string): void {
+export function getSessionUserName(): string | null {
+  try {
+    return localStorage.getItem(SESSION_NAME_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setSessionUserId(userId: string, userName?: string): void {
   localStorage.setItem(SESSION_KEY, userId);
+  if (userName) {
+    localStorage.setItem(SESSION_NAME_KEY, userName);
+  }
 }
 
 export function clearSession(): void {
   localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_NAME_KEY);
 }
 
 export async function findUserByCredentials(

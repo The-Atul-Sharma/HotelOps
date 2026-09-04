@@ -43,12 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (sessionUser?.id === sessionId) {
+        setSessionUserId(sessionUser.id, sessionUser.name);
         setResolving(false);
         return;
       }
 
       const cached = users.find((u) => u.id === sessionId && u.active);
       if (cached) {
+        setSessionUserId(cached.id, cached.name);
         setSessionUser(cached);
         setResolving(false);
         return;
@@ -64,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSessionId(null);
         setSessionUser(null);
       } else {
+        setSessionUserId(fetched.id, fetched.name);
         setSessionUser(fetched);
       }
       setResolving(false);
@@ -78,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (username: string, password: string) => {
     const matched = await findUserByCredentials(username, password);
     if (!matched) return false;
-    setSessionUserId(matched.id);
+    setSessionUserId(matched.id, matched.name);
     setSessionId(matched.id);
     setSessionUser(matched);
     setResolving(false);
