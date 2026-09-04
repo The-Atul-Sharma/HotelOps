@@ -14,13 +14,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  ResponsiveModal,
+  ResponsiveModalBody,
+  ResponsiveModalContent,
+  ResponsiveModalDescription,
+  ResponsiveModalFooter,
+  ResponsiveModalHeader,
+  ResponsiveModalTitle,
+} from '@/components/shared/ResponsiveModal';
 import { bookingHooks, notificationHooks } from '@/hooks/useEntities';
 import { PAYMENT_MODES, PAYMENT_ACCOUNTS, formatPaymentAccount } from '@/config/constants';
 import { formatINR, formatRoomTariffLabel } from '@/utils/format';
@@ -199,16 +200,16 @@ export function BookingCheckoutDialog({
   const roomBillTotal = bill.roomTotal;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Check Out — {booking.guestName}</DialogTitle>
-          <DialogDescription>
+    <ResponsiveModal open={open} onOpenChange={onOpenChange}>
+      <ResponsiveModalContent className="flex max-h-[90dvh] max-w-none flex-col sm:max-w-md">
+        <ResponsiveModalHeader>
+          <ResponsiveModalTitle>Check Out — {booking.guestName}</ResponsiveModalTitle>
+          <ResponsiveModalDescription>
             Room {booking.roomNumber} · Review dues and pending extras before checkout.
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveModalDescription>
+        </ResponsiveModalHeader>
 
-        <div className="space-y-4 text-sm">
+        <ResponsiveModalBody className="space-y-4 text-sm">
           <div className="space-y-2 rounded-lg border p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Room Bill
@@ -442,17 +443,17 @@ export function BookingCheckoutDialog({
             <span>Grand total</span>
             <Money value={grandTotal} muteZero={false} />
           </div>
-        </div>
+        </ResponsiveModalBody>
 
-        <DialogFooter className="gap-3 sm:gap-3">
+        <ResponsiveModalFooter className="gap-3">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
             Cancel
           </Button>
           <Button onClick={confirmCheckOut} disabled={balance > 0 || submitting}>
             Checkout
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveModalFooter>
+      </ResponsiveModalContent>
+    </ResponsiveModal>
   );
 }

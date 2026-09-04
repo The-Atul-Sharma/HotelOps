@@ -23,12 +23,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveModal,
+  ResponsiveModalBody,
+  ResponsiveModalContent,
+  ResponsiveModalFooter,
+  ResponsiveModalHeader,
+  ResponsiveModalTitle,
+} from "@/components/shared/ResponsiveModal";
 import {
   Select,
   SelectContent,
@@ -397,20 +398,21 @@ export default function ExpensesPage() {
         </>
       )}
 
-      <Dialog
+      <ResponsiveModal
         open={open}
         onOpenChange={(o) => {
           setOpen(o);
           if (!o) setEditing(null);
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
+        <ResponsiveModalContent className="flex max-h-[90dvh] max-w-none flex-col sm:max-w-lg">
+          <ResponsiveModalHeader>
+            <ResponsiveModalTitle>
               {editing ? "Edit Expense" : "Add Expense"}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
+            </ResponsiveModalTitle>
+          </ResponsiveModalHeader>
+          <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+            <ResponsiveModalBody className="grid gap-4">
             <div className="grid grid-cols-2 gap-4">
               <F label="Date" error={errors.date?.message}>
                 <Input type="date" {...register("date")} />
@@ -497,7 +499,8 @@ export default function ExpensesPage() {
             <F label="Remark">
               <Input {...register("remarks")} placeholder="Optional" />
             </F>
-            <DialogFooter>
+            </ResponsiveModalBody>
+            <ResponsiveModalFooter>
               <Button
                 type="button"
                 variant="outline"
@@ -508,10 +511,10 @@ export default function ExpensesPage() {
               <Button type="submit">
                 {editing ? "Save Changes" : "Add Expense"}
               </Button>
-            </DialogFooter>
+            </ResponsiveModalFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveModalContent>
+      </ResponsiveModal>
     </div>
   );
 }

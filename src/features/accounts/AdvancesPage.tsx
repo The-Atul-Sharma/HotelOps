@@ -18,12 +18,13 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  ResponsiveModal,
+  ResponsiveModalBody,
+  ResponsiveModalContent,
+  ResponsiveModalFooter,
+  ResponsiveModalHeader,
+  ResponsiveModalTitle,
+} from '@/components/shared/ResponsiveModal';
 import {
   Select,
   SelectContent,
@@ -280,18 +281,19 @@ export default function AdvancesPage() {
         </>
       )}
 
-      <Dialog
+      <ResponsiveModal
         open={open}
         onOpenChange={(o) => {
           setOpen(o);
           if (!o) setEditing(null);
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editing ? 'Edit Advance' : 'Add Advance'}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4">
+        <ResponsiveModalContent className="flex max-h-[90dvh] max-w-none flex-col sm:max-w-lg">
+          <ResponsiveModalHeader>
+            <ResponsiveModalTitle>{editing ? 'Edit Advance' : 'Add Advance'}</ResponsiveModalTitle>
+          </ResponsiveModalHeader>
+          <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+            <ResponsiveModalBody className="grid grid-cols-2 gap-4">
             <F label="Date" error={errors.date?.message}>
               <Input type="date" {...register('date')} />
             </F>
@@ -358,15 +360,16 @@ export default function AdvancesPage() {
             <F label="Purpose" className="col-span-2">
               <Input {...register('purpose')} />
             </F>
-            <DialogFooter className="col-span-2">
+            </ResponsiveModalBody>
+            <ResponsiveModalFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
               <Button type="submit">{editing ? 'Save Changes' : 'Add Advance'}</Button>
-            </DialogFooter>
+            </ResponsiveModalFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveModalContent>
+      </ResponsiveModal>
     </div>
   );
 }

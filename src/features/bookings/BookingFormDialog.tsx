@@ -6,12 +6,13 @@ import { toast } from 'sonner';
 import dayjs from 'dayjs';
 import { Trash2 } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  ResponsiveModal,
+  ResponsiveModalBody,
+  ResponsiveModalContent,
+  ResponsiveModalFooter,
+  ResponsiveModalHeader,
+  ResponsiveModalTitle,
+} from '@/components/shared/ResponsiveModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,7 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Money } from '@/components/shared/Money';
 import { useConfirm } from '@/components/shared/ConfirmDialog';
 import {
@@ -400,12 +400,12 @@ export function BookingFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl p-0">
-        <DialogHeader className="border-b px-6 py-4">
-          <DialogTitle>{booking ? 'Edit Booking' : 'New Booking'}</DialogTitle>
-        </DialogHeader>
-        <ScrollArea className="max-h-[70vh]">
+    <ResponsiveModal open={open} onOpenChange={onOpenChange}>
+      <ResponsiveModalContent className="flex max-h-[90dvh] max-w-none flex-col sm:max-w-2xl">
+        <ResponsiveModalHeader className="border-b">
+          <ResponsiveModalTitle>{booking ? 'Edit Booking' : 'New Booking'}</ResponsiveModalTitle>
+        </ResponsiveModalHeader>
+        <ResponsiveModalBody className="px-0 py-0">
           <form
             id="booking-form"
             onSubmit={handleSubmit(onSubmit)}
@@ -561,8 +561,8 @@ export function BookingFormDialog({
               )}
             </div>
           </form>
-        </ScrollArea>
-        <DialogFooter className="border-t px-6 py-4 sm:justify-between">
+        </ResponsiveModalBody>
+        <ResponsiveModalFooter className="sm:justify-between">
           {booking ? (
             <Button
               type="button"
@@ -584,9 +584,9 @@ export function BookingFormDialog({
               {isSaving ? 'Saving…' : booking ? 'Save Changes' : 'Create Booking'}
             </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveModalFooter>
+      </ResponsiveModalContent>
+    </ResponsiveModal>
   );
 }
 
