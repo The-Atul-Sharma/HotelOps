@@ -1,4 +1,4 @@
-import dayjs from 'dayjs';
+import { appDay, appNow } from '@/lib/dayjs';
 import { bookingRoomRate } from '@/utils/finance';
 
 const inrFormatter = new Intl.NumberFormat('en-IN', {
@@ -27,12 +27,12 @@ export function formatNumber(value: number): string {
 
 export function formatDate(date?: string | Date | null, fmt = 'DD MMM YYYY'): string {
   if (!date) return '-';
-  return dayjs(date).format(fmt);
+  return appDay(date).format(fmt);
 }
 
 export function formatDateTime(date?: string | Date | null): string {
   if (!date) return '-';
-  return dayjs(date).format('DD MMM YYYY, hh:mm A');
+  return appDay(date).format('DD MMM YYYY, hh:mm A');
 }
 
 export function formatRoomTariffLabel(
@@ -45,8 +45,8 @@ export function formatRoomTariffLabel(
 }
 
 export function relativeTime(date: string | Date): string {
-  const now = dayjs();
-  const then = dayjs(date);
+  const now = appNow();
+  const then = appDay(date);
   const diffMin = now.diff(then, 'minute');
   if (diffMin < 1) return 'just now';
   if (diffMin < 60) return `${diffMin}m ago`;

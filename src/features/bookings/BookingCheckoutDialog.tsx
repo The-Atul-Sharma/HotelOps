@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import dayjs from 'dayjs';
+import { appToday } from '@/lib/dayjs';
 import { Money } from '@/components/shared/Money';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -128,7 +128,7 @@ export function BookingCheckoutDialog({
       amount,
       mode: payMode,
       account: payAccount,
-      date: dayjs().format('YYYY-MM-DD'),
+      date: appToday(),
     };
     const nextPayments = [...payments, entry];
     setRecordingPayment(true);

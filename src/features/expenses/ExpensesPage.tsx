@@ -46,7 +46,7 @@ import { PaginationBar } from "@/components/shared/Pagination";
 import { EXPENSE_CATEGORIES, PAYMENT_ACCOUNTS, PAYMENT_MODES, formatPaymentAccount } from "@/config/constants";
 import { formatDate, formatINR } from "@/utils/format";
 import { inRange } from "@/utils/dateRange";
-import dayjs from "dayjs";
+import { appToday } from '@/lib/dayjs';
 import type { Expense, PaymentAccount, PaymentMode, TransactionCategory } from "@/types";
 
 const schema = z
@@ -97,7 +97,7 @@ function namePlaceholder(category: TransactionCategory) {
 
 function emptyForm(): FormValues {
   return {
-    date: dayjs().format("YYYY-MM-DD"),
+    date: appToday(),
     category: "Grocery",
     expenseName: "Grocery",
     amount: undefined,
@@ -143,7 +143,7 @@ export default function ExpensesPage() {
     filtered,
     `${resetKey}|${categoryFilter}|${debounced}`,
   );
-  const today = dayjs().format("YYYY-MM-DD");
+  const today = appToday();
   const todayTotal = filtered
     .filter((e) => e.date === today)
     .reduce((s, e) => s + e.amount, 0);

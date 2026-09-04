@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import dayjs from 'dayjs';
+import { appDay, appNow } from '@/lib/dayjs';
 import { Trash2 } from 'lucide-react';
 import {
   ResponsiveModal,
@@ -73,7 +73,7 @@ const schema = z
     status: z.enum(FORM_STATUSES),
     notes: z.string().optional(),
   })
-  .refine((d) => dayjs(d.checkOutDate).isAfter(dayjs(d.checkInDate)), {
+  .refine((d) => appDay(d.checkOutDate).isAfter(appDay(d.checkInDate)), {
     message: 'Check-out must be after check-in',
     path: ['checkOutDate'],
   });
@@ -124,8 +124,8 @@ export function BookingFormDialog({
       idType: 'Aadhaar',
       idNumber: '',
       roomId: '',
-      checkInDate: dayjs().format('YYYY-MM-DD'),
-      checkOutDate: dayjs().add(1, 'day').format('YYYY-MM-DD'),
+      checkInDate: appNow().format('YYYY-MM-DD'),
+      checkOutDate: appNow().add(1, 'day').format('YYYY-MM-DD'),
       adults: 1,
       children: 0,
       roomTariff: undefined,
@@ -177,8 +177,8 @@ export function BookingFormDialog({
         idType: 'Aadhaar',
         idNumber: '',
         roomId: '',
-        checkInDate: dayjs().format('YYYY-MM-DD'),
-        checkOutDate: dayjs().add(1, 'day').format('YYYY-MM-DD'),
+        checkInDate: appNow().format('YYYY-MM-DD'),
+        checkOutDate: appNow().add(1, 'day').format('YYYY-MM-DD'),
         adults: 1,
         children: 0,
         roomTariff: undefined,

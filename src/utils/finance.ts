@@ -1,4 +1,4 @@
-import dayjs from 'dayjs';
+import { appDay, appNow } from '@/lib/dayjs';
 import type {
   Booking,
   PaymentStatus,
@@ -14,7 +14,7 @@ export function round2(n: number): number {
 }
 
 export function calculateNights(checkIn: string, checkOut: string): number {
-  const nights = dayjs(checkOut).diff(dayjs(checkIn), 'day');
+  const nights = appDay(checkOut).diff(appDay(checkIn), 'day');
   return Math.max(nights, 1);
 }
 
@@ -253,11 +253,11 @@ export function calculatePaymentStatus(
   if (totalAmount <= 0) return 'PAID';
   if (pending <= 0) return 'PAID';
   if (paidAmount > 0 && pending > 0) {
-    if (dueDate && dayjs(dueDate).isBefore(dayjs(), 'day')) return 'OVERDUE';
+    if (dueDate && appDay(dueDate).isBefore(appNow(), 'day')) return 'OVERDUE';
     return 'PARTIAL';
   }
   if (paidAmount <= 0) {
-    if (dueDate && dayjs(dueDate).isBefore(dayjs(), 'day')) return 'OVERDUE';
+    if (dueDate && appDay(dueDate).isBefore(appNow(), 'day')) return 'OVERDUE';
     return 'PENDING';
   }
   return 'PENDING';
@@ -415,10 +415,10 @@ export function calculateProfit(income: number, expense: number): number {
 }
 
 export function calculateDailyCollection(transactions: Transaction[], date: string): number {
-  const target = dayjs(date).format('YYYY-MM-DD');
+  const target = appDay(date).format('YYYY-MM-DD');
   return round2(
     transactions
-      .filter((t) => dayjs(t.date).format('YYYY-MM-DD') === target)
+      .filter((t) => appDay(t.date).format('YYYY-MM-DD') === target)
       .reduce((s, t) => s + transactionCollection(t).total, 0),
   );
 }

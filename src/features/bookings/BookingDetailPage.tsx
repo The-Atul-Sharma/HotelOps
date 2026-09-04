@@ -62,7 +62,7 @@ import { buildExtraCharge, formatExtraChargeLabel, extraChargeName, recalculateE
 import { Invoice } from './Invoice';
 import { PAYMENT_MODES, PAYMENT_ACCOUNTS, formatPaymentAccount, EXTRA_CHARGE_ITEM_TYPES } from '@/config/constants';
 import type { BookingCharge, BookingPayment, ExtraChargeItemType, PaymentAccount, PaymentMode } from '@/types';
-import dayjs from 'dayjs';
+import { appToday } from '@/lib/dayjs';
 
 export default function BookingDetailPage() {
   const { id } = useParams();
@@ -240,7 +240,7 @@ export default function BookingDetailPage() {
         amount: charge.amount,
         mode: chargeMode,
         account: chargeAccount,
-        date: dayjs().format('YYYY-MM-DD'),
+        date: appToday(),
         note: charge.label,
       });
     }
@@ -375,7 +375,7 @@ export default function BookingDetailPage() {
       amount,
       mode: payMode,
       account: payAccount,
-      date: dayjs().format('YYYY-MM-DD'),
+      date: appToday(),
     };
     const nextPayments = [...payments, entry];
     await persistBill(extraCharges, nextPayments);

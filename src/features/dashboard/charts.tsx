@@ -32,6 +32,12 @@ const axisProps = {
   fontSize: 12,
   tickLine: false,
   axisLine: false,
+  tick: { fill: 'var(--muted-foreground)', fontSize: 12 },
+};
+
+const legendStyle = {
+  fontSize: 12,
+  color: 'var(--muted-foreground)',
 };
 
 const tooltipStyle = {
@@ -43,6 +49,7 @@ const tooltipStyle = {
     fontSize: 12,
   },
   labelStyle: { color: 'var(--foreground)', fontWeight: 600 },
+  itemStyle: { color: 'var(--muted-foreground)' },
 };
 
 function compact(n: number) {
@@ -88,7 +95,7 @@ export function RevenueExpenseChart({ data }: { data: RevenueExpensePoint[] }) {
         <XAxis dataKey="label" {...axisProps} />
         <YAxis {...axisProps} tickFormatter={compact} width={56} />
         <Tooltip {...tooltipStyle} formatter={moneyFormatter} />
-        <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+        <Legend iconType="circle" wrapperStyle={legendStyle} />
         <Area type="monotone" dataKey="revenue" name="Revenue" stroke="var(--chart-1)" strokeWidth={2} fill="url(#rev)" />
         <Area type="monotone" dataKey="expense" name="Expenses" stroke="var(--chart-5)" strokeWidth={2} fill="url(#exp)" />
       </AreaChart>
@@ -134,7 +141,7 @@ export function PaymentMethodChart({ data }: { data: { name: string; value: numb
           ))}
         </Pie>
         <Tooltip {...tooltipStyle} formatter={moneyFormatter} />
-        <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+        <Legend iconType="circle" wrapperStyle={legendStyle} />
       </PieChart>
     </ResponsiveContainer>
   );
@@ -159,7 +166,7 @@ export function OccupancyChart({ data }: { data: { name: string; value: number }
           ))}
         </Pie>
         <Tooltip {...tooltipStyle} />
-        <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+        <Legend iconType="circle" wrapperStyle={legendStyle} />
       </PieChart>
     </ResponsiveContainer>
   );
@@ -173,12 +180,18 @@ export interface MonthlyProfitPoint {
 }
 
 export function MonthlyProfitChart({ data }: { data: MonthlyProfitPoint[] }) {
+  const monthlyAxis = {
+    stroke: 'var(--muted-foreground)',
+    fontSize: 12,
+    tickLine: false,
+    axisLine: false,
+  };
   return (
     <ResponsiveContainer width="100%" height={260}>
       <ComposedChart data={data} margin={{ left: -12, right: 8, top: 8 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-        <XAxis dataKey="label" {...axisProps} />
-        <YAxis {...axisProps} tickFormatter={compact} width={56} />
+        <XAxis dataKey="label" {...monthlyAxis} />
+        <YAxis {...monthlyAxis} tickFormatter={compact} width={56} />
         <Tooltip {...tooltipStyle} cursor={{ fill: 'var(--accent)' }} formatter={moneyFormatter} />
         <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
         <Bar dataKey="income" name="Income" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
@@ -221,7 +234,7 @@ export function PendingPaymentsChart({ data }: { data: { name: string; paid: num
         <XAxis type="number" {...axisProps} tickFormatter={compact} />
         <YAxis type="category" dataKey="name" {...axisProps} width={90} />
         <Tooltip {...tooltipStyle} cursor={{ fill: 'var(--accent)' }} formatter={moneyFormatter} />
-        <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+        <Legend iconType="circle" wrapperStyle={legendStyle} />
         <Bar dataKey="paid" name="Paid" stackId="a" fill="var(--chart-2)" radius={[4, 0, 0, 4]} />
         <Bar dataKey="pending" name="Pending" stackId="a" fill="var(--chart-5)" radius={[0, 4, 4, 0]} />
       </BarChart>

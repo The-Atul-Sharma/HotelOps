@@ -1,4 +1,4 @@
-import dayjs from 'dayjs';
+import { appDay, appNow } from '@/lib/dayjs';
 import type { DateRange } from '@/types';
 
 export type RangePreset = 'today' | 'week' | 'month' | 'lastMonth' | 'all' | 'custom';
@@ -13,7 +13,7 @@ export const RANGE_LABELS: Record<RangePreset, string> = {
 };
 
 export function presetToRange(preset: RangePreset): DateRange {
-  const now = dayjs();
+  const now = appNow();
   switch (preset) {
     case 'today':
       return { from: now.startOf('day').format('YYYY-MM-DD'), to: now.endOf('day').format('YYYY-MM-DD') };
@@ -34,20 +34,20 @@ export function presetToRange(preset: RangePreset): DateRange {
 }
 
 export function inRange(date: string, range: DateRange): boolean {
-  const d = dayjs(date);
+  const d = appDay(date);
   return (
-    (d.isAfter(dayjs(range.from).startOf('day')) || d.isSame(dayjs(range.from), 'day')) &&
-    (d.isBefore(dayjs(range.to).endOf('day')) || d.isSame(dayjs(range.to), 'day'))
+    (d.isAfter(appDay(range.from).startOf('day')) || d.isSame(appDay(range.from), 'day')) &&
+    (d.isBefore(appDay(range.to).endOf('day')) || d.isSame(appDay(range.to), 'day'))
   );
 }
 
 export function formatRangePeriodLabel(preset: RangePreset, range: DateRange): string {
   switch (preset) {
     case 'today':
-      return dayjs(range.from).format('D MMMM YYYY');
+      return appDay(range.from).format('D MMMM YYYY');
     case 'week': {
-      const from = dayjs(range.from);
-      const to = dayjs(range.to);
+      const from = appDay(range.from);
+      const to = appDay(range.to);
       if (from.isSame(to, 'year')) {
         return `${from.format('D MMM')} – ${to.format('D MMM YYYY')}`;
       }
@@ -55,12 +55,12 @@ export function formatRangePeriodLabel(preset: RangePreset, range: DateRange): s
     }
     case 'month':
     case 'lastMonth':
-      return dayjs(range.from).format('MMMM YYYY');
+      return appDay(range.from).format('MMMM YYYY');
     case 'all':
       return 'All Time';
     case 'custom': {
-      const from = dayjs(range.from);
-      const to = dayjs(range.to);
+      const from = appDay(range.from);
+      const to = appDay(range.to);
       if (from.isSame(to, 'day')) return from.format('D MMMM YYYY');
       if (from.isSame(to, 'year')) {
         return `${from.format('D MMM')} – ${to.format('D MMM YYYY')}`;

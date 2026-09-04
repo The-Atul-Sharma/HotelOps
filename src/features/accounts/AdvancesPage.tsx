@@ -39,7 +39,7 @@ import { ADVANCE_TYPES, PAYMENT_ACCOUNTS, PAYMENT_MODES, formatPaymentAccount } 
 import { round2 } from '@/utils/finance';
 import { formatDate, formatINR } from '@/utils/format';
 import { inRange } from '@/utils/dateRange';
-import dayjs from 'dayjs';
+import { appToday } from '@/lib/dayjs';
 import type { Advance, AdvanceType, PaymentAccount, PaymentMode } from '@/types';
 
 const schema = z.object({
@@ -54,7 +54,7 @@ const schema = z.object({
 type FormValues = z.input<typeof schema>;
 
 const emptyForm = (): FormValues => ({
-  date: dayjs().format('YYYY-MM-DD'),
+  date: appToday(),
   type: 'Staff',
   amount: undefined,
   paymentMode: 'Cash',

@@ -1,4 +1,4 @@
-import dayjs from 'dayjs';
+import { appDay } from '@/lib/dayjs';
 import type { Booking, BookingCharge, ExtraChargeItemType } from '@/types';
 import { round2 } from '@/utils/finance';
 import { formatINR } from '@/utils/format';
@@ -145,7 +145,7 @@ export function datesOverlap(
   bStart: string,
   bEnd: string,
 ): boolean {
-  return dayjs(aStart).isBefore(dayjs(bEnd)) && dayjs(bStart).isBefore(dayjs(aEnd));
+  return appDay(aStart).isBefore(appDay(bEnd)) && appDay(bStart).isBefore(appDay(aEnd));
 }
 
 export function hasConflict(

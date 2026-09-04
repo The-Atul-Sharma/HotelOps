@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import dayjs from 'dayjs';
+import { appDay, appToday } from '@/lib/dayjs';
 import {
   useRooms,
   useBookings,
@@ -52,7 +52,7 @@ export function useDashboardData(range: DateRange) {
   const { data: advances = [], isLoading: aLoad } = useAdvances();
 
   return useMemo(() => {
-    const todayStr = dayjs().format('YYYY-MM-DD');
+    const todayStr = appToday();
     const activeBookings = bookings.filter(isActiveBooking);
 
     const incomeBookings = activeBookings.filter((b) => inRange(b.checkInDate, range));
@@ -92,7 +92,7 @@ export function useDashboardData(range: DateRange) {
         return (
           sum +
           bookingPayments(b)
-            .filter((p) => dayjs(p.date).format('YYYY-MM-DD') === todayStr)
+            .filter((p) => appDay(p.date).format('YYYY-MM-DD') === todayStr)
             .reduce((s, p) => s + p.amount, 0)
         );
       }, 0),
@@ -100,7 +100,7 @@ export function useDashboardData(range: DateRange) {
 
     const todayExpenses = round2(
       expenses
-        .filter((e) => dayjs(e.date).format('YYYY-MM-DD') === todayStr)
+        .filter((e) => appDay(e.date).format('YYYY-MM-DD') === todayStr)
         .reduce((s, e) => s + e.amount, 0),
     );
 
@@ -110,10 +110,10 @@ export function useDashboardData(range: DateRange) {
     const reserved = board.filter((x) => x.status === 'Reserved').length;
 
     const todayCheckIns = activeBookings.filter(
-      (b) => dayjs(b.checkInDate).format('YYYY-MM-DD') === todayStr,
+      (b) => appDay(b.checkInDate).format('YYYY-MM-DD') === todayStr,
     ).length;
     const todayCheckOuts = activeBookings.filter(
-      (b) => dayjs(b.checkOutDate).format('YYYY-MM-DD') === todayStr,
+      (b) => appDay(b.checkOutDate).format('YYYY-MM-DD') === todayStr,
     ).length;
 
     const kpis = {
@@ -136,23 +136,23 @@ export function useDashboardData(range: DateRange) {
 
     const byDay = new Map<string, { sort: string; revenue: number; expense: number }>();
     for (const b of incomeBookings) {
-      const sort = dayjs(b.checkInDate).format('YYYY-MM-DD');
-      const label = dayjs(b.checkInDate).format('DD MMM');
+      const sort = appDay(b.checkInDate).format('YYYY-MM-DD');
+      const label = appDay(b.checkInDate).format('DD MMM');
       const entry = byDay.get(label) ?? { sort, revenue: 0, expense: 0 };
       entry.revenue += bookingTotalIncome(b);
       byDay.set(label, entry);
     }
     for (const e of expensesInRange) {
-      const sort = dayjs(e.date).format('YYYY-MM-DD');
-      const label = dayjs(e.date).format('DD MMM');
+      const sort = appDay(e.date).format('YYYY-MM-DD');
+      const label = appDay(e.date).format('DD MMM');
       const entry = byDay.get(label) ?? { sort, revenue: 0, expense: 0 };
       entry.expense += e.amount;
       entry.sort = sort;
       byDay.set(label, entry);
     }
     for (const a of advancesInRange) {
-      const sort = dayjs(a.date).format('YYYY-MM-DD');
-      const label = dayjs(a.date).format('DD MMM');
+      const sort = appDay(a.date).format('YYYY-MM-DD');
+      const label = appDay(a.date).format('DD MMM');
       const entry = byDay.get(label) ?? { sort, revenue: 0, expense: 0 };
       entry.expense += a.amount;
       entry.sort = sort;
@@ -192,23 +192,23 @@ export function useDashboardData(range: DateRange) {
     const monthMap = new Map<string, { sort: string; income: number; expense: number }>();
     for (const b of activeBookings) {
       if (!inRange(b.checkInDate, range)) continue;
-      const sort = dayjs(b.checkInDate).format('YYYY-MM');
-      const label = dayjs(b.checkInDate).format('MMM YY');
+      const sort = appDay(b.checkInDate).format('YYYY-MM');
+      const label = appDay(b.checkInDate).format('MMM YY');
       const entry = monthMap.get(label) ?? { sort, income: 0, expense: 0 };
       entry.income += bookingTotalIncome(b);
       monthMap.set(label, entry);
     }
     for (const e of expensesInRange) {
-      const sort = dayjs(e.date).format('YYYY-MM');
-      const label = dayjs(e.date).format('MMM YY');
+      const sort = appDay(e.date).format('YYYY-MM');
+      const label = appDay(e.date).format('MMM YY');
       const entry = monthMap.get(label) ?? { sort, income: 0, expense: 0 };
       entry.expense += e.amount;
       entry.sort = sort;
       monthMap.set(label, entry);
     }
     for (const a of advancesInRange) {
-      const sort = dayjs(a.date).format('YYYY-MM');
-      const label = dayjs(a.date).format('MMM YY');
+      const sort = appDay(a.date).format('YYYY-MM');
+      const label = appDay(a.date).format('MMM YY');
       const entry = monthMap.get(label) ?? { sort, income: 0, expense: 0 };
       entry.expense += a.amount;
       entry.sort = sort;

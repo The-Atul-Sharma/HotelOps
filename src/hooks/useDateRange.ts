@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
-import dayjs from 'dayjs';
+import { appNow } from '@/lib/dayjs';
 import type { DateRange } from '@/types';
 import { presetToRange, type RangePreset } from '@/utils/dateRange';
 
 export function useDateRange(initial: RangePreset = 'month') {
   const [preset, setPreset] = useState<RangePreset>(initial);
   const [customRange, setCustomRange] = useState<DateRange>(() => ({
-    from: dayjs().startOf('month').format('YYYY-MM-DD'),
-    to: dayjs().format('YYYY-MM-DD'),
+    from: appNow().startOf('month').format('YYYY-MM-DD'),
+    to: appNow().format('YYYY-MM-DD'),
   }));
 
   const range = useMemo(() => {

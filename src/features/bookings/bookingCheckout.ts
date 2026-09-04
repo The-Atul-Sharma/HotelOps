@@ -1,4 +1,4 @@
-import dayjs from 'dayjs';
+import { appToday } from '@/lib/dayjs';
 import type { Booking, BookingCharge, BookingPayment, HotelSettings, PaymentAccount, PaymentMode } from '@/types';
 import { bookingRoomTotal, computeSplitBookingBill, isExtraChargePaid, sumPayments } from '@/utils/finance';
 
@@ -112,7 +112,7 @@ export function buildSettledExtras(
       amount: charge.amount,
       mode,
       account,
-      date: dayjs().format('YYYY-MM-DD'),
+      date: appToday(),
       note: charge.label,
     });
   }
