@@ -52,99 +52,110 @@ export default function DashboardPage() {
         actions={<DateRangeFilter {...filterProps} />}
       />
 
-      <AttentionSection
-        pending={k.pending}
-        overdueCount={data.overdueCount}
-        overdueAmount={data.overdueAmount}
-        available={k.available}
-        reserved={k.reserved}
-        todayBookings={data.todayBookings}
-      />
+      <div className="space-y-3">
+        <AttentionSection
+          pending={k.pending}
+          overdueCount={data.overdueCount}
+          overdueAmount={data.overdueAmount}
+          available={k.available}
+          reserved={k.reserved}
+          todayBookings={data.todayBookings}
+        />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-        <KpiCard
-          label="Total Revenue"
-          value={k.totalRevenue}
-          icon={TrendingUp}
-          tone="success"
-        />
-        <KpiCard
-          label="Room Tariff"
-          value={k.roomTariff}
-          icon={BedDouble}
-          tone="primary"
-        />
-        <KpiCard
-          label="Extra Charges"
-          value={k.extrasTotal}
-          icon={ConciergeBell}
-          tone="success"
-        />
-        <KpiCard
-          label="Total Expenses"
-          value={k.totalExpenses}
-          icon={TrendingDown}
-          tone="destructive"
-        />
-        <KpiCard
-          label="Net Profit"
-          value={k.netProfit}
-          icon={IndianRupee}
-          tone="primary"
-        />
-        <KpiCard
-          label="Pending Payments"
-          value={k.pending}
-          icon={Clock}
-          tone="warning"
-        />
-        <KpiCard
-          label="Advances Given"
-          value={k.advancesGiven}
-          icon={HandCoins}
-          tone="default"
-        />
-        <KpiCard
-          label="Today's Collection"
-          value={k.todayCollection}
-          icon={Banknote}
-          tone="success"
-        />
-        <KpiCard
-          label="Today's Expenses"
-          value={k.todayExpenses}
-          icon={Wallet}
-          tone="destructive"
-        />
-        <KpiCard
-          label="Occupied Rooms"
-          value={k.occupied}
-          icon={BedDouble}
-          tone="primary"
-          format="number"
-        />
-        <KpiCard
-          label="Available Rooms"
-          value={k.available}
-          icon={DoorOpen}
-          tone="success"
-          format="number"
-        />
-        <KpiCard
-          label="Today's Check-ins"
-          value={k.todayCheckIns}
-          icon={CalendarArrowDown}
-          tone="default"
-          format="number"
-        />
-        <KpiCard
-          label="Today's Check-outs"
-          value={k.todayCheckOuts}
-          icon={CalendarArrowUp}
-          tone="default"
-          format="number"
-        />
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold">Finance</h2>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+          <KpiCard
+            label="Net Profit"
+            value={k.netProfit}
+            icon={IndianRupee}
+            tone="primary"
+          />
+          <KpiCard
+            label="Total Revenue"
+            value={k.totalRevenue}
+            icon={TrendingUp}
+            tone="success"
+          />
+          <KpiCard
+            label="Room Tariff"
+            value={k.roomTariff}
+            icon={BedDouble}
+            tone="primary"
+          />
+          <KpiCard
+            label="Extra Charges"
+            value={k.extrasTotal}
+            icon={ConciergeBell}
+            tone="success"
+          />
+          <KpiCard
+            label="Total Expenses"
+            value={k.totalExpenses}
+            icon={TrendingDown}
+            tone="destructive"
+          />
+          <KpiCard
+            label="Advances Given"
+            value={k.advancesGiven}
+            icon={HandCoins}
+            tone="default"
+          />
+          <KpiCard
+            label="Pending Payments"
+            value={k.pending}
+            icon={Clock}
+            tone="warning"
+          />
+        </div>
+        </section>
       </div>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold">Today & Occupancy</h2>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+          <KpiCard
+            label="Today's Collection"
+            value={k.todayCollection}
+            icon={Banknote}
+            tone="success"
+          />
+          <KpiCard
+            label="Today's Expenses"
+            value={k.todayExpenses}
+            icon={Wallet}
+            tone="destructive"
+          />
+          <KpiCard
+            label="Occupied Rooms"
+            value={k.occupied}
+            icon={BedDouble}
+            tone="primary"
+            format="number"
+          />
+          <KpiCard
+            label="Available Rooms"
+            value={k.available}
+            icon={DoorOpen}
+            tone="success"
+            format="number"
+          />
+          <KpiCard
+            label="Today's Check-ins"
+            value={k.todayCheckIns}
+            icon={CalendarArrowDown}
+            tone="default"
+            format="number"
+          />
+          <KpiCard
+            label="Today's Check-outs"
+            value={k.todayCheckOuts}
+            icon={CalendarArrowUp}
+            tone="default"
+            format="number"
+          />
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <ChartCard title="Revenue vs Expenses">
@@ -229,12 +240,12 @@ function AttentionSection({
   };
 
   return (
-    <Card className="p-4">
-      <div className="mb-3 flex items-center gap-2">
+    <Card className="px-4 py-3">
+      <div className="mb-2 flex items-center gap-2">
         <AlertTriangle className="h-4 w-4 text-warning" />
         <h2 className="text-sm font-semibold">Attention Required</h2>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {flags.map((f, i) => (
           <Link
             key={i}

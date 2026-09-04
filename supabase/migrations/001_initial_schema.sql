@@ -173,6 +173,7 @@ create table if not exists notifications (
   title text not null,
   message text not null,
   read boolean not null default false,
+  user_id text not null,
   created_at timestamptz not null default now()
 );
 

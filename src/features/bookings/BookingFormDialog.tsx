@@ -33,7 +33,7 @@ import {
   useSettings,
   bookingHooks,
   guestHooks,
-  notificationHooks,
+  useNotifyUsers,
 } from '@/hooks/useEntities';
 import { calculateNights, computeBookingBill, round2 } from '@/utils/finance';
 import { formatRoomTariffLabel } from '@/utils/format';
@@ -98,7 +98,7 @@ export function BookingFormDialog({
   const removeBooking = bookingHooks.useRemove();
   const createGuest = guestHooks.useCreate();
   const updateGuest = guestHooks.useUpdate();
-  const createNotification = notificationHooks.useCreate();
+  const notifyUsers = useNotifyUsers();
   const confirm = useConfirm();
   const submittingRef = useRef(false);
 
@@ -369,7 +369,7 @@ export function BookingFormDialog({
       toast.success('Booking updated');
     } else {
       const created = await createBooking.mutateAsync(payload);
-      createNotification.mutate({
+      notifyUsers.mutate({
         type: 'New Booking',
         title: `New booking ${created.code}`,
         message: `${created.guestName} · Room ${created.roomNumber}`,

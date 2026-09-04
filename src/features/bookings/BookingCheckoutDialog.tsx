@@ -22,7 +22,7 @@ import {
   ResponsiveModalHeader,
   ResponsiveModalTitle,
 } from '@/components/shared/ResponsiveModal';
-import { bookingHooks, notificationHooks } from '@/hooks/useEntities';
+import { bookingHooks, useNotifyUsers } from '@/hooks/useEntities';
 import { PAYMENT_MODES, PAYMENT_ACCOUNTS, formatPaymentAccount } from '@/config/constants';
 import { formatINR, formatRoomTariffLabel } from '@/utils/format';
 import { roomPaymentsOnly, round2 } from '@/utils/finance';
@@ -53,7 +53,7 @@ export function BookingCheckoutDialog({
   onComplete,
 }: BookingCheckoutDialogProps) {
   const update = bookingHooks.useUpdate();
-  const createNotification = notificationHooks.useCreate();
+  const notifyUsers = useNotifyUsers();
   const [payments, setPayments] = useState<BookingPayment[]>([]);
   const [settleIds, setSettleIds] = useState<Set<string>>(new Set());
   const [collectModes, setCollectModes] = useState<Record<string, PaymentMode>>({});
@@ -139,7 +139,7 @@ export function BookingCheckoutDialog({
       });
       setPayments(nextPayments);
       setPayAmount('');
-      createNotification.mutate({
+      notifyUsers.mutate({
         type: 'Payment Received',
         title: 'Payment received',
         message: `${formatINR(amount)} (${payMode}) from ${booking.guestName}`,

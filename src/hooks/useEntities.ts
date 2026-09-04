@@ -13,8 +13,11 @@ import {
   settingsService,
   auditService,
   getAuditActorName,
+  notifyAllUsers,
   ENTITY_AUDIT_LABELS,
+  type NotificationInput,
 } from '@/services/api';
+import { getSessionUserId } from '@/services/auth';
 import type {
   Room,
   Guest,
@@ -336,7 +339,27 @@ export const useTransactions = transactionHooks.useList;
 export const useExpenses = expenseHooks.useList;
 export const useSuppliers = supplierHooks.useList;
 export const useAdvances = advanceHooks.useList;
-export const useNotifications = notificationHooks.useList;
+export function useNotifications() {
+  const userId = getSessionUserId();
+  return useQuery({
+    queryKey: ['notifications', userId],
+    queryFn: async () => {
+      const all = await notificationService.list();
+      if (!userId) return [];
+      return all.filter((n) => n.userId === userId);
+    },
+    enabled: Boolean(userId),
+  });
+}
+export function useNotifyUsers() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: NotificationInput) => notifyAllUsers(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
 export const useInventory = inventoryHooks.useList;
 export const useUsers = userHooks.useList;
 export const useCreateUser = userHooks.useCreate;

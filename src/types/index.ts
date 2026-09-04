@@ -260,6 +260,7 @@ export interface AppNotification {
   title: string;
   message: string;
   read: boolean;
+  userId: ID;
   createdAt: string;
 }
 

@@ -46,6 +46,15 @@ export const inventoryService = repo<InventoryItem>('inventory', 'i');
 export const userService = repo<User>('users', 'u');
 export const auditRepo = repo<AuditLogEntry>('audit', 'al');
 
+export type NotificationInput = Omit<AppNotification, 'id' | 'createdAt' | 'updatedAt' | 'userId'>;
+
+export async function notifyAllUsers(data: NotificationInput): Promise<void> {
+  const users = (await userService.list()).filter((u) => u.active);
+  await Promise.all(
+    users.map((u) => notificationService.create({ ...data, userId: u.id })),
+  );
+}
+
 export function getAuditActorName(): string {
   const cachedName = getSessionUserName();
   if (cachedName) return cachedName;

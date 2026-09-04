@@ -109,6 +109,16 @@ export const MOCK_NOTIFICATIONS: AppNotification[] = [
     title: 'Pending cleared',
     message: 'All August register pending payments marked as paid',
     read: false,
+    userId: 'u1',
+    createdAt: '2026-08-31T12:00:00.000Z',
+  },
+  {
+    id: 'n2',
+    type: 'Payment Received',
+    title: 'Pending cleared',
+    message: 'All August register pending payments marked as paid',
+    read: false,
+    userId: 'u2',
     createdAt: '2026-08-31T12:00:00.000Z',
   },
 ];

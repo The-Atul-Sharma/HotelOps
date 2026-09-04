@@ -40,7 +40,7 @@ import {
   useBookings,
   useSettings,
   bookingHooks,
-  notificationHooks,
+  useNotifyUsers,
 } from '@/hooks/useEntities';
 import { useConfirm } from '@/components/shared/ConfirmDialog';
 import {
@@ -71,7 +71,7 @@ export default function BookingDetailPage() {
   const { data: bookings = [], isLoading } = useBookings();
   const { data: settings } = useSettings();
   const update = bookingHooks.useUpdate();
-  const createNotification = notificationHooks.useCreate();
+  const notifyUsers = useNotifyUsers();
   const confirm = useConfirm();
 
   const [editOpen, setEditOpen] = useState(false);
@@ -367,7 +367,7 @@ export default function BookingDetailPage() {
     };
     const nextPayments = [...payments, entry];
     await persistBill(extraCharges, nextPayments);
-    createNotification.mutate({
+    notifyUsers.mutate({
       type: 'Payment Received',
       title: 'Payment received',
       message: `${formatINR(amount)} (${payMode}) from ${booking.guestName}`,

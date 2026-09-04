@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNotifications } from '@/hooks/useEntities';
+import { getSessionUserId } from '@/services/auth';
 import { notificationService } from '@/services/api';
 import type { AppNotification } from '@/types';
 import { relativeTime } from '@/utils/format';
@@ -15,21 +16,23 @@ import { cn } from '@/lib/utils';
 
 export function NotificationsMenu() {
   const queryClient = useQueryClient();
+  const userId = getSessionUserId();
+  const queryKey = ['notifications', userId] as const;
   const { data: notifications = [] } = useNotifications();
   const unread = notifications.filter((n) => !n.read).length;
 
   const handleOpenChange = (open: boolean) => {
-    if (!open) return;
+    if (!open || !userId) return;
 
-    const current =
-      queryClient.getQueryData<AppNotification[]>(['notifications']) ?? notifications;
-    const alreadyRead = current.filter((n) => n.read);
-    const unreadOnes = current.filter((n) => !n.read);
+    const current = queryClient.getQueryData<AppNotification[]>(queryKey) ?? notifications;
+    const mine = current.filter((n) => n.userId === userId);
+    const alreadyRead = mine.filter((n) => n.read);
+    const unreadOnes = mine.filter((n) => !n.read);
 
     if (alreadyRead.length === 0 && unreadOnes.length === 0) return;
 
     queryClient.setQueryData<AppNotification[]>(
-      ['notifications'],
+      queryKey,
       unreadOnes.map((n) => ({ ...n, read: true })),
     );
 

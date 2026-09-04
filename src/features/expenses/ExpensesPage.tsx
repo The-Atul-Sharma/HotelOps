@@ -37,6 +37,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useExpenses, expenseHooks } from "@/hooks/useEntities";
 import { useDebounced } from "@/hooks/useDebounced";
 import { usePagination } from "@/hooks/usePagination";
@@ -361,8 +367,26 @@ export default function ExpensesPage() {
                     </TableCell>
                     <TableCell>{e.paymentMode}</TableCell>
                     <TableCell>{formatPaymentAccount(e.account)}</TableCell>
-                    <TableCell className="max-w-[160px] truncate text-muted-foreground">
-                      {e.remarks || "—"}
+                    <TableCell className="max-w-[160px] text-muted-foreground">
+                      {e.remarks ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="block truncate cursor-default">
+                                {e.remarks}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="top"
+                              className="max-w-xs break-words"
+                            >
+                              {e.remarks}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       <Money value={e.amount} />
