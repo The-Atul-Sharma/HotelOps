@@ -417,50 +417,54 @@ export function BookingFormDialog({
             <Field label="Mobile (optional)" error={errors.mobile?.message}>
               <Input {...register('mobile')} placeholder="+91 …" />
             </Field>
-            <Field label="Email" error={errors.email?.message}>
-              <Input {...register('email')} placeholder="optional" />
-            </Field>
-            <Field label="Status">
-              <Select
-                value={values.status}
-                onValueChange={(v) => setValue('status', v as (typeof FORM_STATUSES)[number])}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {FORM_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Document Type">
-              <Select
-                value={values.idType}
-                onValueChange={(v) => setValue('idType', v as IdType)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ID_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Document Number" error={errors.idNumber?.message}>
-              <Input {...register('idNumber')} placeholder="ID number" />
-            </Field>
+            <div className="col-span-full grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Email" error={errors.email?.message} className="min-w-0">
+                <Input {...register('email')} placeholder="optional" />
+              </Field>
+              <Field label="Status" className="min-w-0">
+                <Select
+                  value={values.status}
+                  onValueChange={(v) => setValue('status', v as (typeof FORM_STATUSES)[number])}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FORM_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+            <div className="col-span-full grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Document Type" className="min-w-0">
+                <Select
+                  value={values.idType}
+                  onValueChange={(v) => setValue('idType', v as IdType)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ID_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Document Number" error={errors.idNumber?.message} className="min-w-0">
+                <Input {...register('idNumber')} placeholder="ID number" />
+              </Field>
+            </div>
 
-            <Field label="Room Number" error={errors.roomId?.message} className="sm:col-span-2">
+            <Field label="Room Number" error={errors.roomId?.message} className="col-span-full">
               <Select value={values.roomId} onValueChange={(v) => setValue('roomId', v)}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select room number" />
                 </SelectTrigger>
                 <SelectContent>
@@ -496,8 +500,8 @@ export function BookingFormDialog({
             <Field label="Advance Received (₹)">
               <Input type="number" {...register('advanceReceived')} />
             </Field>
-            <div className="grid grid-cols-2 gap-4 sm:contents">
-              <Field label="Payment Mode">
+            <div className="col-span-full grid grid-cols-2 gap-4">
+              <Field label="Payment Mode" className="min-w-0">
                 <Select
                   value={values.paymentMode}
                   onValueChange={(v) => {
@@ -506,7 +510,7 @@ export function BookingFormDialog({
                     if (mode === 'Cash') setValue('paymentAccount', 'None');
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -518,12 +522,12 @@ export function BookingFormDialog({
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Account">
+              <Field label="Account" className="min-w-0">
                 <Select
                   value={values.paymentAccount}
                   onValueChange={(v) => setValue('paymentAccount', v as PaymentAccount)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -537,11 +541,11 @@ export function BookingFormDialog({
               </Field>
             </div>
 
-            <Field label="Notes" className="sm:col-span-2">
+            <Field label="Notes" className="col-span-full">
               <Textarea {...register('notes')} rows={2} placeholder="Special requests…" />
             </Field>
 
-            <div className="rounded-lg border bg-muted/40 p-4 sm:col-span-2">
+            <div className="col-span-full rounded-lg border bg-muted/40 p-4">
               <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                 <Summary label="Nights" value={calc.nights} isCount />
                 <Summary label={formatRoomTariffLabel({ roomRate: calc.roomRate, nights: calc.nights, roomAmount: calc.roomAmount })} value={calc.roomAmount} />

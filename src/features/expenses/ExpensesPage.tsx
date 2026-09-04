@@ -413,11 +413,11 @@ export default function ExpensesPage() {
           </ResponsiveModalHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
             <ResponsiveModalBody className="grid gap-4">
-            <div className="grid grid-cols-2 gap-4">
-              <F label="Date" error={errors.date?.message}>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <F label="Date" error={errors.date?.message} className="min-w-0">
                 <Input type="date" {...register("date")} />
               </F>
-              <F label="Category">
+              <F label="Category" className="min-w-0">
                 <Select
                   value={watch("category")}
                   onValueChange={(v) => {
@@ -429,7 +429,7 @@ export default function ExpensesPage() {
                     );
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -456,8 +456,8 @@ export default function ExpensesPage() {
             <F label="Amount (₹)" error={errors.amount?.message}>
               <Input type="number" inputMode="decimal" {...register("amount")} />
             </F>
-            <div className="grid grid-cols-2 gap-4">
-              <F label="Payment Mode">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <F label="Payment Mode" className="min-w-0">
                 <Select
                   value={watch("paymentMode")}
                   onValueChange={(v) => {
@@ -466,7 +466,7 @@ export default function ExpensesPage() {
                     if (mode === "Cash") setValue("account", "None");
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -478,12 +478,12 @@ export default function ExpensesPage() {
                   </SelectContent>
                 </Select>
               </F>
-              <F label="Account">
+              <F label="Account" className="min-w-0">
                 <Select
                   value={watch("account")}
                   onValueChange={(v) => setValue("account", v as PaymentAccount)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

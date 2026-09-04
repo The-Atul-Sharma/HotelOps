@@ -293,13 +293,13 @@ export default function AdvancesPage() {
             <ResponsiveModalTitle>{editing ? 'Edit Advance' : 'Add Advance'}</ResponsiveModalTitle>
           </ResponsiveModalHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
-            <ResponsiveModalBody className="grid grid-cols-2 gap-4">
-            <F label="Date" error={errors.date?.message}>
+            <ResponsiveModalBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <F label="Date" error={errors.date?.message} className="min-w-0">
               <Input type="date" {...register('date')} />
             </F>
-            <F label="Type">
+            <F label="Type" className="min-w-0">
               <Select value={watch('type')} onValueChange={(v) => setValue('type', v as AdvanceType)}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -311,14 +311,14 @@ export default function AdvancesPage() {
                 </SelectContent>
               </Select>
             </F>
-            <F label="Person / Party" error={errors.person?.message} className="col-span-2">
+            <F label="Person / Party" error={errors.person?.message} className="sm:col-span-2">
               <Input {...register('person')} />
             </F>
-            <F label="Amount (₹)" error={errors.amount?.message}>
+            <F label="Amount (₹)" error={errors.amount?.message} className="min-w-0 sm:col-span-2">
               <Input type="number" {...register('amount')} />
             </F>
-            <div className="col-span-2 grid grid-cols-2 gap-4">
-              <F label="Payment Mode">
+            <div className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-2">
+              <F label="Payment Mode" className="min-w-0">
                 <Select
                   value={watch('paymentMode')}
                   onValueChange={(v) => {
@@ -327,7 +327,7 @@ export default function AdvancesPage() {
                     if (mode === 'Cash') setValue('account', 'None');
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -339,12 +339,12 @@ export default function AdvancesPage() {
                   </SelectContent>
                 </Select>
               </F>
-              <F label="Account">
+              <F label="Account" className="min-w-0">
                 <Select
                   value={watch('account')}
                   onValueChange={(v) => setValue('account', v as PaymentAccount)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -357,7 +357,7 @@ export default function AdvancesPage() {
                 </Select>
               </F>
             </div>
-            <F label="Purpose" className="col-span-2">
+            <F label="Purpose" className="sm:col-span-2">
               <Input {...register('purpose')} />
             </F>
             </ResponsiveModalBody>

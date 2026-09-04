@@ -66,6 +66,10 @@ export function ResponsiveModalContent({
           className,
         )}
         {...props}
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          props.onOpenAutoFocus?.(e);
+        }}
       >
         {children}
       </SheetContent>
@@ -77,6 +81,10 @@ export function ResponsiveModalContent({
       className={cn('gap-0 overflow-hidden p-0', className)}
       showCloseButton={showCloseButton}
       {...props}
+      onOpenAutoFocus={(e) => {
+        e.preventDefault();
+        props.onOpenAutoFocus?.(e);
+      }}
     >
       {children}
     </DialogContent>
