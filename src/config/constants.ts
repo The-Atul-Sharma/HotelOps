@@ -1,5 +1,6 @@
 import type {
   ExtraChargeItemType,
+  IdType,
   PaymentAccount,
   PaymentMode,
   PaymentStatus,
@@ -10,6 +11,15 @@ import type {
   AdvanceStatus,
   UserRole,
 } from '@/types';
+
+export const ID_TYPES: IdType[] = [
+  'Aadhaar',
+  'PAN',
+  'Passport',
+  'Driving License',
+  'Voter ID',
+  'Other',
+];
 
 export const EXTRA_CHARGE_ITEM_TYPES: ExtraChargeItemType[] = [
   'Water Bottle',

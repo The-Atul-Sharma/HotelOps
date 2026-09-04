@@ -39,8 +39,13 @@ import { calculateNights, computeBookingBill, round2 } from '@/utils/finance';
 import { formatRoomTariffLabel } from '@/utils/format';
 import { hasConflict } from './bookingUtils';
 import { nextBookingCode } from '@/services/mockData';
-import { PAYMENT_MODES, PAYMENT_ACCOUNTS, formatPaymentAccount } from '@/config/constants';
-import type { Booking, BookingPayment, PaymentAccount, PaymentMode } from '@/types';
+import {
+  PAYMENT_MODES,
+  PAYMENT_ACCOUNTS,
+  ID_TYPES,
+  formatPaymentAccount,
+} from '@/config/constants';
+import type { Booking, BookingPayment, IdType, PaymentAccount, PaymentMode } from '@/types';
 
 const FORM_STATUSES = ['Checked In', 'Reserved'] as const;
 
@@ -54,6 +59,8 @@ const schema = z
     guestName: z.string().min(2, 'Guest name is required'),
     mobile: z.string().optional(),
     email: z.string().email('Invalid email').optional().or(z.literal('')),
+    idType: z.enum(ID_TYPES as [IdType, ...IdType[]]),
+    idNumber: z.string().optional(),
     roomId: z.string().min(1, 'Select a room'),
     checkInDate: z.string().min(1, 'Check-in date required'),
     checkOutDate: z.string().min(1, 'Check-out date required'),
@@ -90,12 +97,16 @@ export function BookingFormDialog({
   const updateBooking = bookingHooks.useUpdate();
   const removeBooking = bookingHooks.useRemove();
   const createGuest = guestHooks.useCreate();
+  const updateGuest = guestHooks.useUpdate();
   const createNotification = notificationHooks.useCreate();
   const confirm = useConfirm();
   const submittingRef = useRef(false);
 
   const isSaving =
-    createBooking.isPending || updateBooking.isPending || createGuest.isPending;
+    createBooking.isPending ||
+    updateBooking.isPending ||
+    createGuest.isPending ||
+    updateGuest.isPending;
 
   const {
     register,
@@ -110,6 +121,8 @@ export function BookingFormDialog({
       guestName: '',
       mobile: '',
       email: '',
+      idType: 'Aadhaar',
+      idNumber: '',
       roomId: '',
       checkInDate: dayjs().format('YYYY-MM-DD'),
       checkOutDate: dayjs().add(1, 'day').format('YYYY-MM-DD'),
@@ -127,6 +140,7 @@ export function BookingFormDialog({
   useEffect(() => {
     if (!open) return;
     if (booking) {
+      const guest = guests.find((g) => g.id === booking.guestId);
       const status =
         booking.status === 'Reserved' || booking.status === 'Checked In'
           ? booking.status
@@ -135,6 +149,8 @@ export function BookingFormDialog({
         guestName: booking.guestName,
         mobile: booking.mobile ?? '',
         email: booking.email ?? '',
+        idType: guest?.idType ?? 'Aadhaar',
+        idNumber: guest?.idNumber ?? '',
         roomId: booking.roomId,
         checkInDate: booking.checkInDate,
         checkOutDate: booking.checkOutDate,
@@ -158,6 +174,8 @@ export function BookingFormDialog({
         guestName: '',
         mobile: '',
         email: '',
+        idType: 'Aadhaar',
+        idNumber: '',
         roomId: '',
         checkInDate: dayjs().format('YYYY-MM-DD'),
         checkOutDate: dayjs().add(1, 'day').format('YYYY-MM-DD'),
@@ -171,7 +189,7 @@ export function BookingFormDialog({
         notes: '',
       });
     }
-  }, [open, booking, reset]);
+  }, [open, booking, guests, reset]);
 
   const values = watch();
   const selectedRoom = rooms.find((r) => r.id === values.roomId);
@@ -223,17 +241,34 @@ export function BookingFormDialog({
 
     const mobile = (v.mobile ?? '').trim();
     const guestName = v.guestName.trim();
-    let guest = mobile
-      ? guests.find((g) => g.mobile === mobile)
-      : guests.find(
-          (g) => g.name.toLowerCase() === guestName.toLowerCase() && g.mobile === '—',
-        );
+    const idType = v.idType as IdType;
+    const idNumber = (v.idNumber ?? '').trim() || undefined;
+    let guest = booking
+      ? guests.find((g) => g.id === booking.guestId)
+      : mobile
+        ? guests.find((g) => g.mobile === mobile)
+        : guests.find(
+            (g) => g.name.toLowerCase() === guestName.toLowerCase() && g.mobile === '—',
+          );
     if (!guest) {
       guest = await createGuest.mutateAsync({
         name: guestName,
         mobile: mobile || '—',
         email: v.email || undefined,
+        idType,
+        idNumber,
         nationality: 'Indian',
+      });
+    } else {
+      await updateGuest.mutateAsync({
+        id: guest.id,
+        patch: {
+          name: guestName,
+          mobile: mobile || guest.mobile || '—',
+          email: v.email || undefined,
+          idType,
+          idNumber,
+        },
       });
     }
 
@@ -401,6 +436,26 @@ export function BookingFormDialog({
                   ))}
                 </SelectContent>
               </Select>
+            </Field>
+            <Field label="Document Type">
+              <Select
+                value={values.idType}
+                onValueChange={(v) => setValue('idType', v as IdType)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ID_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Document Number" error={errors.idNumber?.message}>
+              <Input {...register('idNumber')} placeholder="ID number" />
             </Field>
 
             <Field label="Room Number" error={errors.roomId?.message} className="sm:col-span-2">
