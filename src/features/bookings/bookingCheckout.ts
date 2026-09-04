@@ -1,21 +1,15 @@
 import { appToday } from '@/lib/dayjs';
 import type { Booking, BookingCharge, BookingPayment, HotelSettings, PaymentAccount, PaymentMode } from '@/types';
-import { bookingRoomTotal, computeSplitBookingBill, isExtraChargePaid, sumPayments } from '@/utils/finance';
+import {
+  bookingRoomTotal,
+  computeSplitBookingBill,
+  isExtraChargePaid,
+  resolveBookingPayments,
+  sumPayments,
+} from '@/utils/finance';
 
 export function getBookingPayments(booking: Booking): BookingPayment[] {
-  if (booking.payments?.length) return booking.payments;
-  if (booking.paidAmount > 0) {
-    return [
-      {
-        id: 'legacy-pay',
-        amount: booking.paidAmount,
-        mode: booking.paymentMode,
-        date: booking.checkInDate,
-        note: 'Payment',
-      },
-    ];
-  }
-  return [];
+  return resolveBookingPayments(booking);
 }
 
 export function resolveTaxPercent(booking: Booking, settings?: HotelSettings | null): number {

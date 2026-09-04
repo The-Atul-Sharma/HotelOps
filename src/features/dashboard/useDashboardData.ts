@@ -30,19 +30,7 @@ function bookingPending(b: Booking) {
 }
 
 function bookingPayments(b: Booking): BookingPayment[] {
-  if (b.payments?.length) return b.payments;
-  if (b.paidAmount > 0) {
-    return [
-      {
-        id: `${b.id}-legacy`,
-        amount: b.paidAmount,
-        mode: b.paymentMode,
-        date: b.checkInDate,
-        note: 'Payment',
-      },
-    ];
-  }
-  return [];
+  return resolveBookingPayments(b);
 }
 
 export function useDashboardData(range: DateRange) {

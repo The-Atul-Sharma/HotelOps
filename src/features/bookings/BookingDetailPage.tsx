@@ -49,6 +49,7 @@ import {
   computeSplitBookingBill,
   isExtraChargePaid,
   paymentsByMode,
+  resolveBookingPayments,
   roomPaymentsOnly,
   sumPayments,
   round2,
@@ -113,20 +114,7 @@ export default function BookingDetailPage() {
 
   const roomTotal = bookingRoomTotal(booking);
   const extraCharges = booking.extraCharges ?? [];
-  const payments: BookingPayment[] =
-    booking.payments?.length
-      ? booking.payments
-      : booking.paidAmount > 0
-        ? [
-            {
-              id: 'legacy-pay',
-              amount: booking.paidAmount,
-              mode: booking.paymentMode,
-              date: booking.checkInDate,
-              note: 'Payment',
-            },
-          ]
-        : [];
+  const payments: BookingPayment[] = resolveBookingPayments(booking);
   const billPayments = roomPaymentsOnly(payments, extraCharges);
   const roomModeTotals = paymentsByMode(billPayments);
   const taxPercent =

@@ -13,7 +13,6 @@ import {
   Banknote,
   AlertTriangle,
   CheckCircle2,
-  BadgeIndianRupee,
   ConciergeBell,
 } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -79,12 +78,6 @@ export default function DashboardPage() {
           label="Extra Charges"
           value={k.extrasTotal}
           icon={ConciergeBell}
-          tone="success"
-        />
-        <KpiCard
-          label="Period Collection"
-          value={k.collected}
-          icon={BadgeIndianRupee}
           tone="success"
         />
         <KpiCard

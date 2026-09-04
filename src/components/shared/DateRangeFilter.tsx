@@ -47,7 +47,7 @@ export function DateRangeFilter({
             onChange={(e) =>
               onCustomRangeChange({ ...customRange, from: e.target.value })
             }
-            className="w-[150px]"
+            className="w-[150px] max-w-full min-w-0"
           />
           <span className="text-xs text-muted-foreground">to</span>
           <Input
@@ -56,7 +56,7 @@ export function DateRangeFilter({
             onChange={(e) =>
               onCustomRangeChange({ ...customRange, to: e.target.value })
             }
-            className="w-[150px]"
+            className="w-[150px] max-w-full min-w-0"
           />
         </>
       )}

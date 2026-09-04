@@ -20,16 +20,14 @@ import { usePagination } from "@/hooks/usePagination";
 import { useDateRange } from "@/hooks/useDateRange";
 import { inRange } from "@/utils/dateRange";
 import {
-  bookingExtrasIncome,
   bookingPendingAmount,
   bookingPendingBreakdown,
-  bookingRoomIncome,
-  bookingTotalIncome,
   calculatePaymentStatus,
   computeAccountBalances,
   isActiveBooking,
   paymentCollectionBucket,
   resolveBookingPayments,
+  roomPaymentsOnly,
   round2,
 } from "@/utils/finance";
 import { formatDate, formatINR } from "@/utils/format";
@@ -85,27 +83,18 @@ export default function ReportsPage() {
     [bookings, range],
   );
 
-  const incomeBookings = useMemo(
-    () =>
-      bookings.filter(
-        (b) => isActiveBooking(b) && inRange(b.checkInDate, range),
-      ),
-    [bookings, range],
-  );
-
   const { rows, columns, summary, chartData, subtitle } = useMemo(
     () =>
       buildReport(
         report,
         paymentRows,
-        incomeBookings,
         bookings,
         scopedExpenses,
         expenses,
         advances,
         range,
       ),
-    [report, paymentRows, incomeBookings, bookings, scopedExpenses, expenses, advances, range],
+    [report, paymentRows, bookings, scopedExpenses, expenses, advances, range],
   );
 
   const { page, setPage, pageItems, total: pageTotal } = usePagination(
@@ -276,7 +265,6 @@ function collectionTotals(payments: PaymentRow[]) {
 function buildReport(
   report: ReportType,
   paymentRows: PaymentRow[],
-  incomeBookings: Booking[],
   bookings: Booking[],
   expenses: Expense[],
   allExpenses: Expense[],
@@ -290,21 +278,7 @@ function buildReport(
   subtitle?: string;
 } {
   const totals = collectionTotals(paymentRows);
-  const totalRevenue = round2(
-    incomeBookings.reduce((s, b) => s + bookingTotalIncome(b), 0),
-  );
   const totalExpenses = round2(expenses.reduce((s, e) => s + e.amount, 0));
-  const netProfit = round2(totalRevenue - totalExpenses);
-  const totalPending = round2(
-    bookings
-      .filter(
-        (b) =>
-          isActiveBooking(b) &&
-          bookingPending(b) > 0 &&
-          inRange(b.checkInDate, range),
-      )
-      .reduce((s, b) => s + bookingPending(b), 0),
-  );
 
   switch (report) {
     case "Daily Collection": {
@@ -345,16 +319,16 @@ function buildReport(
     }
     case "Daily Profit": {
       const map = new Map<string, { income: number; expense: number }>();
-      for (const b of incomeBookings) {
-        const date = b.checkInDate.slice(0, 10);
+      for (const { payment } of paymentRows) {
+        const date = payment.date.slice(0, 10);
         const entry = map.get(date) ?? { income: 0, expense: 0 };
-        entry.income += bookingTotalIncome(b);
+        entry.income = round2(entry.income + payment.amount);
         map.set(date, entry);
       }
       for (const e of expenses) {
         const date = e.date.slice(0, 10);
         const entry = map.get(date) ?? { income: 0, expense: 0 };
-        entry.expense += e.amount;
+        entry.expense = round2(entry.expense + e.amount);
         map.set(date, entry);
       }
       const rows = Array.from(map.entries())
@@ -365,6 +339,10 @@ function buildReport(
           Expense: round2(v.expense),
           Profit: round2(v.income - v.expense),
         }));
+      const dailyIncome = round2(
+        paymentRows.reduce((s, r) => s + r.payment.amount, 0),
+      );
+      const dailyProfit = round2(dailyIncome - totalExpenses);
       return {
         rows,
         columns: [
@@ -376,7 +354,7 @@ function buildReport(
         summary: [
           {
             label: "Total Income",
-            value: totalRevenue,
+            value: dailyIncome,
             tone: "text-success",
           },
           {
@@ -386,7 +364,7 @@ function buildReport(
           },
           {
             label: "Net Profit",
-            value: netProfit,
+            value: dailyProfit,
             tone: "text-primary",
           },
         ],
@@ -394,24 +372,30 @@ function buildReport(
     }
     case "Monthly Profit & Loss": {
       const map = new Map<string, { income: number; expense: number }>();
-      for (const b of incomeBookings) {
-        const key = b.checkInDate.slice(0, 7);
+      for (const { payment } of paymentRows) {
+        const key = payment.date.slice(0, 7);
         const entry = map.get(key) ?? { income: 0, expense: 0 };
-        entry.income += bookingTotalIncome(b);
+        entry.income = round2(entry.income + payment.amount);
         map.set(key, entry);
       }
       for (const e of expenses) {
         const key = e.date.slice(0, 7);
         const entry = map.get(key) ?? { income: 0, expense: 0 };
-        entry.expense += e.amount;
+        entry.expense = round2(entry.expense + e.amount);
         map.set(key, entry);
       }
-      const rows = Array.from(map.entries()).map(([month, v]) => ({
-        Month: month,
-        Income: round2(v.income),
-        Expense: round2(v.expense),
-        Profit: round2(v.income - v.expense),
-      }));
+      const rows = Array.from(map.entries())
+        .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+        .map(([month, v]) => ({
+          Month: month,
+          Income: round2(v.income),
+          Expense: round2(v.expense),
+          Profit: round2(v.income - v.expense),
+        }));
+      const monthlyIncome = round2(
+        paymentRows.reduce((s, r) => s + r.payment.amount, 0),
+      );
+      const monthlyProfit = round2(monthlyIncome - totalExpenses);
       return {
         rows,
         columns: [
@@ -423,7 +407,7 @@ function buildReport(
         summary: [
           {
             label: "Total Income",
-            value: totalRevenue,
+            value: monthlyIncome,
             tone: "text-success",
           },
           {
@@ -433,7 +417,7 @@ function buildReport(
           },
           {
             label: "Net Profit",
-            value: netProfit,
+            value: monthlyProfit,
             tone: "text-primary",
           },
         ],
@@ -441,33 +425,36 @@ function buildReport(
     }
     case "Pending Payments": {
       const rows = bookings
-        .filter(
-          (b) =>
-            isActiveBooking(b) &&
-            bookingPending(b) > 0 &&
-            inRange(b.checkInDate, range),
+        .filter((b) => {
+          if (!isActiveBooking(b) || bookingPending(b) <= 0) return false;
+          return b.checkInDate <= range.to && b.checkOutDate >= range.from;
+        })
+        .sort(
+          (a, b) =>
+            new Date(b.checkOutDate).getTime() - new Date(a.checkOutDate).getTime(),
         )
         .map((b) => {
           const breakdown = bookingPendingBreakdown(b);
           return {
-          Date: formatDate(b.checkInDate),
-          Guest: b.guestName || "—",
-          Room: b.roomNumber || "—",
-          Total: breakdown.grandTotal,
-          Paid: breakdown.paid,
-          "Extras Due": breakdown.extrasPending,
-          Pending: bookingPending(b),
-          Status: calculatePaymentStatus(
-            breakdown.grandTotal,
-            breakdown.paid,
-            b.checkOutDate,
-          ),
-        };
+            Date: formatDate(b.checkOutDate),
+            Guest: b.guestName || "—",
+            Room: b.roomNumber || "—",
+            Total: breakdown.grandTotal,
+            Paid: breakdown.paid,
+            "Extras Due": breakdown.extrasPending,
+            Pending: bookingPending(b),
+            Status: calculatePaymentStatus(
+              breakdown.grandTotal,
+              breakdown.paid,
+              b.checkOutDate,
+            ),
+          };
         });
+      const pendingTotal = round2(rows.reduce((s, r) => s + Number(r.Pending), 0));
       return {
         rows,
         columns: [
-          { key: "Date", label: "Date" },
+          { key: "Date", label: "Due Date" },
           { key: "Guest", label: "Guest" },
           { key: "Room", label: "Room" },
           { key: "Total", label: "Total", align: "right", money: true },
@@ -479,7 +466,7 @@ function buildReport(
         summary: [
           {
             label: "Total Pending",
-            value: totalPending,
+            value: pendingTotal,
             tone: "text-warning",
           },
         ],
@@ -487,12 +474,22 @@ function buildReport(
     }
     case "Room Revenue": {
       const map = new Map<string, { rent: number; extras: number }>();
-      for (const b of incomeBookings) {
-        if (!b.roomNumber) continue;
-        const entry = map.get(b.roomNumber) ?? { rent: 0, extras: 0 };
-        entry.rent += bookingRoomIncome(b);
-        entry.extras += bookingExtrasIncome(b);
-        map.set(b.roomNumber, entry);
+      for (const b of bookings) {
+        if (!isActiveBooking(b) || !b.roomNumber) continue;
+        const allPayments = resolveBookingPayments(b);
+        const roomPayIds = new Set(
+          roomPaymentsOnly(allPayments, b.extraCharges).map((p) => p.id),
+        );
+        for (const payment of allPayments) {
+          if (!inRange(payment.date, range)) continue;
+          const entry = map.get(b.roomNumber) ?? { rent: 0, extras: 0 };
+          if (roomPayIds.has(payment.id)) {
+            entry.rent = round2(entry.rent + payment.amount);
+          } else {
+            entry.extras = round2(entry.extras + payment.amount);
+          }
+          map.set(b.roomNumber, entry);
+        }
       }
       const rows = Array.from(map.entries())
         .sort((a, b) => b[1].rent + b[1].extras - (a[1].rent + a[1].extras))
@@ -502,6 +499,8 @@ function buildReport(
           Extras: round2(v.extras),
           Revenue: round2(v.rent + v.extras),
         }));
+      const rentTotal = round2(rows.reduce((s, r) => s + Number(r["Room Rent"]), 0));
+      const extrasTotal = round2(rows.reduce((s, r) => s + Number(r.Extras), 0));
       return {
         rows,
         columns: [
@@ -513,40 +512,47 @@ function buildReport(
         summary: [
           {
             label: "Room Rent",
-            value: round2(
-              incomeBookings.reduce((s, b) => s + bookingRoomIncome(b), 0),
-            ),
+            value: rentTotal,
           },
           {
             label: "Extra Charges",
-            value: round2(
-              incomeBookings.reduce((s, b) => s + bookingExtrasIncome(b), 0),
-            ),
+            value: extrasTotal,
           },
         ],
       };
     }
     case "Extra Charges": {
-      const active = bookings.filter(
-        (b) =>
-          isActiveBooking(b) &&
-          inRange(b.checkInDate, range) &&
-          bookingExtrasIncome(b) > 0,
-      );
-      const rows = active
-        .sort(
-          (a, b) =>
-            new Date(b.checkInDate).getTime() - new Date(a.checkInDate).getTime(),
-        )
-        .map((b) => ({
-          Date: formatDate(b.checkInDate),
-          Guest: b.guestName,
-          Room: b.roomNumber,
-          "Extra Charges": bookingExtrasIncome(b),
+      type ExtraAgg = { date: string; guest: string; room: string; amount: number };
+      const map = new Map<string, ExtraAgg>();
+      for (const b of bookings) {
+        if (!isActiveBooking(b)) continue;
+        const payments = resolveBookingPayments(b);
+        for (const charge of b.extraCharges ?? []) {
+          const amount = Number(charge.amount) || 0;
+          if (amount <= 0) continue;
+          const pay = payments.find((p) => p.id === `pay-${charge.id}`);
+          const date = (pay?.date ?? b.checkInDate).slice(0, 10);
+          if (!inRange(date, range)) continue;
+          const key = `${date}|${b.id}`;
+          const entry = map.get(key) ?? {
+            date,
+            guest: b.guestName,
+            room: b.roomNumber,
+            amount: 0,
+          };
+          entry.amount = round2(entry.amount + amount);
+          map.set(key, entry);
+        }
+      }
+      const rows = Array.from(map.values())
+        .sort((a, b) => (a.date < b.date ? 1 : -1))
+        .map((v) => ({
+          Date: formatDate(v.date),
+          Guest: v.guest,
+          Room: v.room,
+          "Extra Charges": v.amount,
         }));
-      const extrasTotal = round2(
-        active.reduce((s, b) => s + bookingExtrasIncome(b), 0),
-      );
+      const extrasTotal = round2(rows.reduce((s, r) => s + Number(r["Extra Charges"]), 0));
       return {
         rows,
         columns: [

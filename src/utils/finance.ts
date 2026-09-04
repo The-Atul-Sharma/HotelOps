@@ -304,7 +304,7 @@ export function paymentCollectionBucket(mode: string): CollectionBucket | null {
 }
 
 export function resolveBookingPayments(booking: Booking): BookingPayment[] {
-  if (booking.payments?.length) return booking.payments;
+  if (booking.payments != null) return booking.payments;
   if (booking.paidAmount > 0) {
     return [
       {

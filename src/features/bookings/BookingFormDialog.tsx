@@ -482,10 +482,10 @@ export function BookingFormDialog({
               </Select>
             </Field>
 
-            <Field label="Check-in Date" error={errors.checkInDate?.message}>
+            <Field label="Check-in Date" error={errors.checkInDate?.message} className="min-w-0">
               <Input type="date" {...register('checkInDate')} />
             </Field>
-            <Field label="Check-out Date" error={errors.checkOutDate?.message}>
+            <Field label="Check-out Date" error={errors.checkOutDate?.message} className="min-w-0">
               <Input type="date" {...register('checkOutDate')} />
             </Field>
             <Field label="Adults">

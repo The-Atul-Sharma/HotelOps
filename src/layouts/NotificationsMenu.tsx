@@ -12,11 +12,11 @@ import { cn } from '@/lib/utils';
 
 export function NotificationsMenu() {
   const { data: notifications = [] } = useNotifications();
-  const update = notificationHooks.useUpdate();
+  const remove = notificationHooks.useRemove();
   const unread = notifications.filter((n) => !n.read).length;
 
-  const markAll = () => {
-    notifications.filter((n) => !n.read).forEach((n) => update.mutate({ id: n.id, patch: { read: true } }));
+  const clearAll = () => {
+    notifications.forEach((n) => remove.mutate(n.id));
   };
 
   return (
@@ -34,9 +34,9 @@ export function NotificationsMenu() {
       <DropdownMenuContent align="end" className="w-80 p-0">
         <div className="flex items-center justify-between border-b px-3 py-2">
           <span className="text-sm font-medium">Notifications</span>
-          {unread > 0 && (
-            <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={markAll}>
-              <Check className="h-3.5 w-3.5" /> Mark all read
+          {notifications.length > 0 && (
+            <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={clearAll}>
+              <Check className="h-3.5 w-3.5" /> Clear all
             </Button>
           )}
         </div>
@@ -47,7 +47,7 @@ export function NotificationsMenu() {
             notifications.map((n) => (
               <button
                 key={n.id}
-                onClick={() => update.mutate({ id: n.id, patch: { read: true } })}
+                onClick={() => remove.mutate(n.id)}
                 className={cn(
                   'flex w-full flex-col items-start gap-0.5 border-b px-3 py-2.5 text-left transition-colors hover:bg-accent',
                   !n.read && 'bg-primary/5',
