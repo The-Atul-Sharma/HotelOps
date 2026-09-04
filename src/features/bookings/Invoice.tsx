@@ -26,8 +26,8 @@ export const Invoice = forwardRef<HTMLDivElement, { booking: Booking; settings: 
     const halfRate = round2(taxPercent / 2);
 
     return (
-      <div ref={ref} className="bg-white p-8 text-black">
-        <div className="flex items-start justify-between border-b-2 border-black pb-4">
+      <div ref={ref} className="invoice-sheet bg-white p-8 text-black">
+        <div className="flex items-start justify-between border-b-2 pb-4">
           <div>
             <h1 className="text-2xl font-bold">{settings.hotelName}</h1>
             <p className="text-sm">{settings.address}</p>
@@ -58,50 +58,50 @@ export const Invoice = forwardRef<HTMLDivElement, { booking: Booking; settings: 
 
         <table className="mt-6 w-full text-sm">
           <thead>
-            <tr className="border-y border-black">
+            <tr className="border-y">
               <th className="py-2 text-left">Description</th>
               <th className="py-2 text-right">Amount</th>
             </tr>
           </thead>
           <tbody>
-            <tr className="border-b border-gray-300">
+            <tr className="border-b">
               <td className="py-1.5">
                 {formatRoomTariffLabel(booking)} · Room {booking.roomNumber}
               </td>
               <td className="py-1.5 text-right">{formatINR(roomTotal)}</td>
             </tr>
             {booking.discount > 0 && (
-              <tr className="border-b border-gray-300">
+              <tr className="border-b">
                 <td className="py-1.5">Discount</td>
                 <td className="py-1.5 text-right">-{formatINR(booking.discount)}</td>
               </tr>
             )}
             {taxPercent > 0 && (
               <>
-                <tr className="border-b border-gray-300">
+                <tr className="border-b">
                   <td className="py-1.5">CGST @ {halfRate}%</td>
                   <td className="py-1.5 text-right">{formatINR(cgst)}</td>
                 </tr>
-                <tr className="border-b border-gray-300">
+                <tr className="border-b">
                   <td className="py-1.5">SGST @ {halfRate}%</td>
                   <td className="py-1.5 text-right">{formatINR(sgst)}</td>
                 </tr>
               </>
             )}
             {booking.foodAmount > 0 && (
-              <tr className="border-b border-gray-300">
+              <tr className="border-b">
                 <td className="py-1.5">Food</td>
                 <td className="py-1.5 text-right">{formatINR(booking.foodAmount)}</td>
               </tr>
             )}
             {booking.roomService > 0 && (
-              <tr className="border-b border-gray-300">
+              <tr className="border-b">
                 <td className="py-1.5">Room Service</td>
                 <td className="py-1.5 text-right">{formatINR(booking.roomService)}</td>
               </tr>
             )}
             {groupedExtras.map((g) => (
-              <tr key={g.key} className="border-b border-gray-300">
+              <tr key={g.key} className="border-b">
                 <td className="py-1.5">
                   {formatGroupedExtraChargeLabel(g)}
                   {g.quantity > 1 && (
@@ -113,7 +113,7 @@ export const Invoice = forwardRef<HTMLDivElement, { booking: Booking; settings: 
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-y-2 border-black font-bold">
+            <tr className="border-y-2 font-bold">
               <td className="py-2">Grand Total</td>
               <td className="py-2 text-right">{formatINR(grandTotal)}</td>
             </tr>

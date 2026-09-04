@@ -149,6 +149,16 @@ body {
   background: var(--muted-foreground);
 }
 
+.invoice-sheet {
+  --border: hsl(214 32% 91%);
+  color-scheme: light;
+}
+
+.invoice-sheet,
+.invoice-sheet * {
+  border-color: hsl(214 32% 91%) !important;
+}
+
 /* Screen: keep print sheet off-layout */
 #invoice-print-root {
   display: none;
@@ -268,5 +278,12 @@ body {
     background: white !important;
     color: black !important;
     z-index: 99999 !important;
+    --border: hsl(214 32% 91%) !important;
+    color-scheme: light;
+  }
+
+  body.invoice-print #invoice-print-root,
+  body.invoice-print #invoice-print-root * {
+    border-color: hsl(214 32% 91%) !important;
   }
 }

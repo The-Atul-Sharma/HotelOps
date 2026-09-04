@@ -1025,7 +1025,7 @@ export default function BookingDetailPage() {
       <BookingFormDialog open={editOpen} onOpenChange={setEditOpen} booking={booking} />
 
       <Dialog open={invoiceOpen} onOpenChange={setInvoiceOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl [&_[data-slot=dialog-close]]:border [&_[data-slot=dialog-close]]:bg-background [&_[data-slot=dialog-close]]:p-1.5 [&_[data-slot=dialog-close]]:text-foreground [&_[data-slot=dialog-close]]:opacity-100 [&_[data-slot=dialog-close]]:shadow-sm">
           {settings && (
             <div className="overflow-auto bg-white">
               <Invoice booking={booking} settings={settings} />
