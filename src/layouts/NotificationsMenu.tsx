@@ -1,4 +1,5 @@
-import { Bell, Check } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -6,21 +7,41 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useNotifications, notificationHooks } from '@/hooks/useEntities';
+import { useNotifications } from '@/hooks/useEntities';
+import { notificationService } from '@/services/api';
+import type { AppNotification } from '@/types';
 import { relativeTime } from '@/utils/format';
 import { cn } from '@/lib/utils';
 
 export function NotificationsMenu() {
+  const queryClient = useQueryClient();
   const { data: notifications = [] } = useNotifications();
-  const remove = notificationHooks.useRemove();
   const unread = notifications.filter((n) => !n.read).length;
 
-  const clearAll = () => {
-    notifications.forEach((n) => remove.mutate(n.id));
+  const handleOpenChange = (open: boolean) => {
+    if (!open) return;
+
+    const current =
+      queryClient.getQueryData<AppNotification[]>(['notifications']) ?? notifications;
+    const alreadyRead = current.filter((n) => n.read);
+    const unreadOnes = current.filter((n) => !n.read);
+
+    if (alreadyRead.length === 0 && unreadOnes.length === 0) return;
+
+    queryClient.setQueryData<AppNotification[]>(
+      ['notifications'],
+      unreadOnes.map((n) => ({ ...n, read: true })),
+    );
+
+    void (async () => {
+      await Promise.all(alreadyRead.map((n) => notificationService.remove(n.id)));
+      await Promise.all(unreadOnes.map((n) => notificationService.update(n.id, { read: true })));
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    })();
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
@@ -34,22 +55,16 @@ export function NotificationsMenu() {
       <DropdownMenuContent align="end" className="w-80 p-0">
         <div className="flex items-center justify-between border-b px-3 py-2">
           <span className="text-sm font-medium">Notifications</span>
-          {notifications.length > 0 && (
-            <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={clearAll}>
-              <Check className="h-3.5 w-3.5" /> Clear all
-            </Button>
-          )}
         </div>
         <ScrollArea className="max-h-80">
           {notifications.length === 0 ? (
             <p className="px-3 py-8 text-center text-sm text-muted-foreground">No notifications</p>
           ) : (
             notifications.map((n) => (
-              <button
+              <div
                 key={n.id}
-                onClick={() => remove.mutate(n.id)}
                 className={cn(
-                  'flex w-full flex-col items-start gap-0.5 border-b px-3 py-2.5 text-left transition-colors hover:bg-accent',
+                  'flex w-full flex-col items-start gap-0.5 border-b px-3 py-2.5 text-left',
                   !n.read && 'bg-primary/5',
                 )}
               >
@@ -59,7 +74,7 @@ export function NotificationsMenu() {
                 </div>
                 <span className="text-xs text-muted-foreground">{n.message}</span>
                 <span className="text-[11px] text-muted-foreground">{relativeTime(n.createdAt)}</span>
-              </button>
+              </div>
             ))
           )}
         </ScrollArea>
